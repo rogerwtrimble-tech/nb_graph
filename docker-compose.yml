@@ -1,0 +1,158 @@
+# =====================================================================================================
+# nb_graph: self-contained demo stack for Rancher Desktop (dockerd / moby engine) or any Docker Engine
+#
+#   docker compose up -d --build        then open  UI http://localhost:8080   NetBox http://localhost:8000
+#
+#   postgres (PG19) <── netbox + netbox-worker (NetBox 4.7 + netbox_numbers plugin)
+#        ^                    ^   │ webhooks (event rules)
+#        │ SQL (nbgraph.*)    │   v
+#   graph-api (FastAPI) ──────┘  REST CRUD / provisioning        seed (one-shot demo data)
+#        ^
+#   ui (React + Cytoscape, nginx)
+# =====================================================================================================
+name: nb_graph
+
+x-netbox: &netbox
+  build:
+    context: .
+    dockerfile: netbox/Dockerfile
+    args:
+      NETBOX_IMAGE: ${NETBOX_IMAGE:-docker.io/netboxcommunity/netbox:v4.7-5.1.1}
+  image: nb_graph/netbox:4.7-local
+  env_file: netbox/env/netbox.env
+  environment:
+    DB_PASSWORD: ${DB_PASSWORD}
+    REDIS_PASSWORD: ${REDIS_PASSWORD}
+    REDIS_CACHE_PASSWORD: ${REDIS_CACHE_PASSWORD}
+    SECRET_KEY: ${SECRET_KEY}
+    API_TOKEN_PEPPER_1: ${API_TOKEN_PEPPER_1}
+    SUPERUSER_NAME: ${SUPERUSER_NAME:-admin}
+    SUPERUSER_PASSWORD: ${SUPERUSER_PASSWORD}
+    SUPERUSER_API_KEY: ${SUPERUSER_API_KEY}
+    SUPERUSER_API_TOKEN: ${SUPERUSER_API_TOKEN}
+  user: "netbox:root"
+  volumes:
+    - ./netbox/configuration:/etc/netbox/config:ro
+    - netbox-media:/opt/netbox/netbox/media:rw
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: docker.io/postgres:${POSTGRES_IMAGE_TAG:-19beta4-alpine}
+    environment:
+      POSTGRES_DB: netbox
+      POSTGRES_USER: netbox
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql            # PG18+ images keep data under /var/lib/postgresql/<major>/
+      - ./db/initdb:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:${PG_PORT:-5432}:5432"     # localhost only: psql into the graph schema
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -q -t 2 -d netbox -U netbox"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  redis:
+    image: docker.io/valkey/valkey:9.1-alpine
+    command: ["sh", "-c", "valkey-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    healthcheck: &redis-health
+      test: ["CMD-SHELL", "[ \"$$(valkey-cli --pass \"$$REDIS_PASSWORD\" ping)\" = PONG ]"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+  redis-cache:
+    image: docker.io/valkey/valkey:9.1-alpine
+    command: ["sh", "-c", "valkey-server --requirepass \"$$REDIS_PASSWORD\""]
+    environment:
+      REDIS_PASSWORD: ${REDIS_CACHE_PASSWORD}
+    healthcheck: *redis-health
+    volumes:
+      - redis-cache-data:/data
+    restart: unless-stopped
+
+  netbox:
+    <<: *netbox
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      redis-cache: { condition: service_healthy }
+    ports:
+      - "${NETBOX_PORT:-8000}:8080"
+    healthcheck:
+      test: /opt/netbox/health.sh
+      start_period: 600s     # first start runs ~800 migrations against PG19
+      timeout: 5s
+      interval: 15s
+      retries: 10
+
+  netbox-worker:
+    <<: *netbox
+    depends_on:
+      netbox: { condition: service_healthy }
+    command: ["/opt/netbox/venv/bin/python", "/opt/netbox/netbox/manage.py", "rqworker"]
+    healthcheck:
+      test: ps -aux | grep -v grep | grep -q rqworker || exit 1
+      start_period: 20s
+      timeout: 3s
+      interval: 15s
+
+  graph-api:
+    build:
+      context: .
+      dockerfile: graph-api/Dockerfile
+    image: nb_graph/graph-api:0.1
+    environment:
+      DATABASE_URL: postgresql://netbox:${DB_PASSWORD}@postgres:5432/netbox
+      NETBOX_URL: http://netbox:8080
+      NETBOX_PUBLIC_URL: http://localhost:${NETBOX_PORT:-8000}
+      NETBOX_TOKEN: nbt_${SUPERUSER_API_KEY}.${SUPERUSER_API_TOKEN}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+      CORS_ORIGINS: http://localhost:${UI_PORT:-8080},http://localhost:5173
+    depends_on:
+      netbox: { condition: service_healthy }
+    ports:
+      - "127.0.0.1:${GRAPH_API_PORT:-8090}:8090"   # OpenAPI docs at /docs
+    restart: unless-stopped
+
+  seed:
+    build:                      # same image as graph-api (built once, cached)
+      context: .
+      dockerfile: graph-api/Dockerfile
+    image: nb_graph/graph-api:0.1
+    command: ["python", "-m", "app.seed"]
+    environment:
+      NETBOX_URL: http://netbox:8080
+      NETBOX_TOKEN: nbt_${SUPERUSER_API_KEY}.${SUPERUSER_API_TOKEN}
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-true}
+      SEED_WEBHOOK_URL: http://graph-api:8090/api/events/netbox
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET}
+    depends_on:
+      graph-api: { condition: service_healthy }
+    restart: "no"
+
+  ui:
+    build:
+      context: .
+      dockerfile: ui/Dockerfile
+    image: nb_graph/ui:0.1
+    depends_on:
+      graph-api: { condition: service_started }
+    ports:
+      - "${UI_PORT:-8080}:80"
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redis-data:
+  redis-cache-data:
+  netbox-media:

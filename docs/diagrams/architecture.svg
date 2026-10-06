@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 640" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="13">
+  <defs>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#455a64"/>
+    </marker>
+    <marker id="arrB" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1e88e5"/>
+    </marker>
+    <marker id="arrG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#2e7d32"/>
+    </marker>
+    <marker id="arrP" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8e24aa"/>
+    </marker>
+  </defs>
+  <rect width="1100" height="640" fill="#ffffff"/>
+  <text x="30" y="38" font-size="22" font-weight="700" fill="#0d1b2a">nb_graph: architecture</text>
+  <text x="30" y="60" fill="#546e7a">Reads: SQL over a live property-graph projection. Writes: NetBox REST API. Changes: webhooks → SSE.</text>
+
+  <!-- browser -->
+  <rect x="30" y="90" width="230" height="150" rx="14" fill="#e3f2fd" stroke="#1e88e5" stroke-width="2"/>
+  <text x="145" y="115" text-anchor="middle" font-weight="700" fill="#0d47a1">Browser</text>
+  <text x="145" y="140" text-anchor="middle" fill="#0d47a1">nb_graph UI</text>
+  <text x="145" y="160" text-anchor="middle" fill="#37474f" font-size="12">React 19 · MUI · Cytoscape.js</text>
+  <text x="145" y="178" text-anchor="middle" fill="#37474f" font-size="12">dagre / fCoSE layouts</text>
+  <text x="145" y="196" text-anchor="middle" fill="#37474f" font-size="12">expand · lenses · inspector</text>
+  <text x="145" y="214" text-anchor="middle" fill="#37474f" font-size="12">CRUD forms · provisioning</text>
+
+  <!-- compose boundary -->
+  <rect x="300" y="80" width="770" height="530" rx="18" fill="#fafafa" stroke="#90a4ae" stroke-dasharray="6 5" stroke-width="1.5"/>
+  <text x="320" y="104" font-weight="700" fill="#455a64">Rancher Desktop (dockerd) · docker compose project "nb_graph"</text>
+
+  <!-- ui nginx -->
+  <rect x="330" y="125" width="190" height="80" rx="12" fill="#ffffff" stroke="#1e88e5" stroke-width="2"/>
+  <text x="425" y="152" text-anchor="middle" font-weight="700">ui (nginx)</text>
+  <text x="425" y="172" text-anchor="middle" fill="#546e7a" font-size="12">static SPA · :8080</text>
+  <text x="425" y="189" text-anchor="middle" fill="#546e7a" font-size="12">/api → graph-api</text>
+
+  <!-- graph-api -->
+  <rect x="330" y="255" width="250" height="150" rx="12" fill="#ffffff" stroke="#00897b" stroke-width="2.5"/>
+  <text x="455" y="282" text-anchor="middle" font-weight="700">graph-api (FastAPI)</text>
+  <text x="455" y="304" text-anchor="middle" fill="#37474f" font-size="12">/api/graph/*  expand · traverse · path</text>
+  <text x="455" y="322" text-anchor="middle" fill="#37474f" font-size="12">/api/object/*  CRUD proxy</text>
+  <text x="455" y="340" text-anchor="middle" fill="#37474f" font-size="12">/api/provision/*  saga + rollback</text>
+  <text x="455" y="358" text-anchor="middle" fill="#37474f" font-size="12">/api/events/*  webhook in · SSE out</text>
+  <text x="455" y="380" text-anchor="middle" fill="#00897b" font-size="12">applies db/graph/*.sql on start</text>
+
+  <!-- seed -->
+  <rect x="330" y="450" width="250" height="56" rx="12" fill="#ffffff" stroke="#78909c" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <text x="455" y="474" text-anchor="middle" font-weight="700">seed (one-shot)</text>
+  <text x="455" y="492" text-anchor="middle" fill="#546e7a" font-size="12">FTTH demo data via REST</text>
+
+  <!-- netbox -->
+  <rect x="700" y="125" width="340" height="140" rx="12" fill="#ffffff" stroke="#8e24aa" stroke-width="2.5"/>
+  <text x="870" y="152" text-anchor="middle" font-weight="700">netbox 4.7  +  netbox-worker</text>
+  <text x="870" y="174" text-anchor="middle" fill="#37474f" font-size="12">official netbox-docker image</text>
+  <text x="870" y="192" text-anchor="middle" fill="#37474f" font-size="12">+ netbox_numbers plugin (DID inventory)</text>
+  <text x="870" y="210" text-anchor="middle" fill="#37474f" font-size="12">REST · validation · change log · permissions</text>
+  <text x="870" y="228" text-anchor="middle" fill="#37474f" font-size="12">event rule → webhook (rq worker)</text>
+  <text x="870" y="250" text-anchor="middle" fill="#8e24aa" font-size="12">:8000</text>
+
+  <!-- valkey -->
+  <rect x="890" y="300" width="150" height="64" rx="12" fill="#ffffff" stroke="#e53935" stroke-width="1.5"/>
+  <text x="965" y="327" text-anchor="middle" font-weight="700">valkey ×2</text>
+  <text x="965" y="346" text-anchor="middle" fill="#546e7a" font-size="12">queue · cache</text>
+
+  <!-- postgres -->
+  <path d="M700 330 a110 18 0 0 0 0 0" fill="none"/>
+  <rect x="660" y="400" width="380" height="180" rx="16" fill="#e8f5e9" stroke="#2e7d32" stroke-width="2.5"/>
+  <text x="850" y="427" text-anchor="middle" font-weight="700" fill="#1b5e20">postgres 19 (19beta4)</text>
+  <rect x="680" y="440" width="160" height="120" rx="10" fill="#ffffff" stroke="#a5d6a7"/>
+  <text x="760" y="462" text-anchor="middle" font-weight="700" font-size="12">public (NetBox)</text>
+  <text x="760" y="482" text-anchor="middle" font-size="11" fill="#455a64">dcim_* · ipam_*</text>
+  <text x="760" y="498" text-anchor="middle" font-size="11" fill="#455a64">circuits_* · tenancy_*</text>
+  <text x="760" y="514" text-anchor="middle" font-size="11" fill="#455a64">dcim_cablepath</text>
+  <text x="760" y="530" text-anchor="middle" font-size="11" fill="#455a64">netbox_numbers_*</text>
+  <rect x="860" y="440" width="160" height="120" rx="10" fill="#ffffff" stroke="#2e7d32" stroke-width="1.5"/>
+  <text x="940" y="462" text-anchor="middle" font-weight="700" font-size="12" fill="#1b5e20">nbgraph</text>
+  <text x="940" y="482" text-anchor="middle" font-size="11" fill="#455a64">vertices · edges (live)</text>
+  <text x="940" y="498" text-anchor="middle" font-size="11" fill="#455a64">neighbors · traverse</text>
+  <text x="940" y="514" text-anchor="middle" font-size="11" fill="#455a64">shortest_path · stats</text>
+  <text x="940" y="530" text-anchor="middle" font-size="11" fill="#455a64">kind · edge_label (lenses)</text>
+  <text x="940" y="548" text-anchor="middle" font-size="10" fill="#8e24aa">PGQ-ready (090, for PG20)</text>
+  <line x1="840" y1="500" x2="860" y2="500" stroke="#2e7d32" stroke-width="2" marker-end="url(#arrG)"/>
+
+  <!-- arrows -->
+  <line x1="260" y1="165" x2="328" y2="165" stroke="#1e88e5" stroke-width="2" marker-end="url(#arrB)"/>
+  <text x="266" y="157" font-size="11" fill="#1e88e5">HTTP</text>
+  <line x1="425" y1="205" x2="425" y2="253" stroke="#1e88e5" stroke-width="2" marker-end="url(#arrB)"/>
+  <text x="432" y="234" font-size="11" fill="#1e88e5">/api</text>
+  <path d="M330 300 C 280 300, 250 240, 250 230" fill="none" stroke="#1e88e5" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#arrB)"/>
+  <text x="196" y="290" font-size="11" fill="#1e88e5">SSE live events</text>
+
+  <line x1="580" y1="380" x2="680" y2="455" stroke="#2e7d32" stroke-width="2.2" marker-end="url(#arrG)"/>
+  <text x="616" y="384" font-size="11" fill="#2e7d32">SQL reads (psycopg pool)</text>
+
+  <line x1="580" y1="285" x2="698" y2="210" stroke="#8e24aa" stroke-width="2.2" marker-end="url(#arrP)"/>
+  <text x="560" y="214" font-size="11" fill="#8e24aa">REST writes (v2 token)</text>
+
+  <path d="M700 250 C 640 300, 620 300, 582 320" fill="none" stroke="#8e24aa" stroke-width="1.8" stroke-dasharray="5 4" marker-end="url(#arrP)"/>
+  <text x="604" y="314" font-size="11" fill="#8e24aa">webhooks</text>
+
+  <line x1="580" y1="478" x2="740" y2="268" stroke="#78909c" stroke-width="1.5" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+  <line x1="850" y1="265" x2="850" y2="398" stroke="#455a64" stroke-width="2" marker-end="url(#arr)"/>
+  <text x="856" y="340" font-size="11" fill="#455a64">ORM</text>
+  <line x1="1000" y1="265" x2="1000" y2="298" stroke="#455a64" stroke-width="1.5" marker-end="url(#arr)"/>
+</svg>

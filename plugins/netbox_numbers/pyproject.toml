@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "netbox-numbers"
+version = "0.1.0"
+description = "Telephone number (DID) inventory for NetBox 4.7 - part of the nb_graph demo"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Apache-2.0" }
+
+[tool.setuptools.packages.find]
+include = ["netbox_numbers*"]
+
+[tool.setuptools.package-data]
+netbox_numbers = ["templates/**/*.html"]
