@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from contextvars import ContextVar
 from typing import Any
 
 import httpx
@@ -9,6 +10,10 @@ import httpx
 from .settings import get_settings
 
 log = logging.getLogger('nbgraph.netbox')
+
+# Set per request by the auth middleware in OIDC mode, so NetBox() acts as the signed-in user.
+# Sync endpoints run in a thread pool that copies the context, so they see it too.
+request_token: ContextVar[str | None] = ContextVar('nbgraph_netbox_token', default=None)
 
 
 class NetBoxError(Exception):
@@ -22,7 +27,7 @@ class NetBox:
     def __init__(self, url: str | None = None, token: str | None = None, timeout: float = 30.0):
         s = get_settings()
         self.base = (url or s.netbox_url).rstrip('/')
-        token = token or s.netbox_token
+        token = token or request_token.get() or s.netbox_token
         self.client = httpx.Client(
             base_url=f'{self.base}/api/',
             headers={

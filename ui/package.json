@@ -20,6 +20,7 @@
     "cytoscape-fcose": "^2.2.0",
     "leaflet": "^1.9.4",
     "notistack": "^3.0.2",
+    "oidc-client-ts": "^3.5.0",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },

@@ -118,6 +118,11 @@ services:
       NETBOX_TOKEN: nbt_${SUPERUSER_API_KEY}.${SUPERUSER_API_TOKEN}
       WEBHOOK_SECRET: ${WEBHOOK_SECRET}
       CORS_ORIGINS: http://localhost:${UI_PORT:-8080},http://localhost:5173
+      # Per-user auth: AUTH_MODE=oidc plus `--profile auth` (the Keycloak below), or point OIDC_* at your IdP
+      AUTH_MODE: ${AUTH_MODE:-none}
+      OIDC_ISSUER: ${OIDC_ISSUER:-http://localhost:8180/realms/nbgraph}
+      OIDC_INTERNAL_URL: ${OIDC_INTERNAL_URL:-http://keycloak:8080/realms/nbgraph}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-nb-graph}
     depends_on:
       netbox: { condition: service_healthy }
     ports:
@@ -149,6 +154,30 @@ services:
       graph-api: { condition: service_started }
     ports:
       - "${UI_PORT:-8080}:80"
+    restart: unless-stopped
+
+  # Optional demo identity provider: docker compose --profile auth up -d   (with AUTH_MODE=oidc in .env)
+  # Users alice/alice (nbgraph-editors), bob/bob (nbgraph-viewers), carol/carol (no access).
+  keycloak:
+    profiles: ["auth"]
+    image: docker.io/keycloak/keycloak:${KEYCLOAK_IMAGE_TAG:-26.4}
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_HOSTNAME: http://localhost:8180          # the issuer browsers see (must match OIDC_ISSUER)
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"     # graph-api reaches it as keycloak:8080
+      KC_HEALTH_ENABLED: "true"
+    volumes:
+      - ./auth/realm-nbgraph.json:/opt/keycloak/data/import/realm-nbgraph.json:ro
+    ports:
+      - "8180:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
     restart: unless-stopped
 
 volumes:

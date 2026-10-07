@@ -23,6 +23,20 @@ class Settings(BaseSettings):
     # CORS origins for local UI development (vite dev server)
     cors_origins: str = 'http://localhost:5173,http://localhost:8080'
 
+    # Authentication. 'none' (demo): the UI is open and every NetBox write uses NETBOX_TOKEN.
+    # 'oidc': every /api call needs an OIDC access token (Keycloak, Entra ID, Okta, ...). Writes then go to
+    # NetBox as that user, through a short-lived per-user NetBox token minted with NETBOX_TOKEN.
+    auth_mode: str = 'none'
+    oidc_issuer: str = ''          # must equal the token's "iss" (the URL the browser uses)
+    oidc_internal_url: str = ''    # same issuer as reached from this container, if different
+    oidc_client_id: str = 'nb-graph'
+    oidc_audience: str = ''        # defaults to oidc_client_id
+    oidc_groups_claim: str = 'groups'
+    # Users must be in one of these IdP groups. Each one is mirrored to a NetBox group of the same name,
+    # and NetBox object permissions on those groups decide what the user may change.
+    oidc_groups: str = 'nbgraph-editors,nbgraph-viewers'
+    user_token_ttl_minutes: int = 480
+
     # Shared secret NetBox webhooks send to /api/events/netbox (header X-NBGraph-Secret)
     webhook_secret: str = 'nbgraph-demo-webhook'
 

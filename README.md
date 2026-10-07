@@ -21,6 +21,7 @@ It ships as one self-contained demo stack (`docker compose`) built for **Rancher
 | **Bulk provisioning** | Right-click a region, site, OLT, PON port or ONT → dry-run plan of every free eligible port → a background job provisions them one saga at a time (each port rolls back on its own) with live progress. |
 | **Number inventory** | IP prefixes and addresses, VLAN groups and VLANs (S-VLAN/C-VLAN), and telephone numbers (DIDs, through the bundled `netbox_numbers` plugin), all as graph nodes. |
 | **Map view** | Sites placed by NetBox latitude/longitude on an OpenStreetMap base, sized by device count and joined by their site-to-site circuits. Drag or place a site to write its position back to NetBox. Click through to the graph. |
+| **Per-user auth (optional)** | `AUTH_MODE=oidc` with any OIDC provider (a Keycloak demo is bundled: `--profile auth`). Writes reach NetBox as the signed-in user, so NetBox permissions apply and the change log names the person. See [docs/auth.md](docs/auth.md). |
 | **Live updates** | A NetBox event rule sends webhooks to graph-api, which pushes them to the UI over SSE. Edits made in NetBox's own UI show up on open graphs within a second. |
 
 ## Quick start (Rancher Desktop)
@@ -103,6 +104,7 @@ nb_graph/
 | [docs/provisioning.md](docs/provisioning.md) | FTTH demo model, service catalogue, provisioning saga and rollback |
 | [docs/ui-guide.md](docs/ui-guide.md) | Using the explorer: gestures, lenses, inspector, CRUD, live updates |
 | [docs/api.md](docs/api.md) | graph-api REST reference with curl examples |
+| [docs/auth.md](docs/auth.md) | Per-user OIDC sign-in, NetBox user/permission mapping, using your own IdP |
 | [docs/nb_graph-status.md](docs/nb_graph-status.md) | Build status, agreed decisions and next ideas |
 
 ## Built from open source
@@ -117,7 +119,7 @@ nb_graph/
 
 ## Status and caveats
 
-* **Demo / MVP.** It uses one superuser API token on the server side, default secrets and no TLS. Read
+* **Demo / MVP.** By default it uses one superuser API token on the server side (turn on [per-user OIDC auth](docs/auth.md) to change that), default secrets and no TLS. Read
   [Hardening](docs/setup-guide.md#hardening-before-anything-beyond-a-demo) before exposing it anywhere.
 * **PostgreSQL 19 is a beta** (19beta4, released 2026-09-24; GA is planned for October 2026). NetBox 4.7 officially
   supports PG 15+ and does not yet list PG19. nb_graph runs it on PG19 anyway: all ~800 migrations and the full

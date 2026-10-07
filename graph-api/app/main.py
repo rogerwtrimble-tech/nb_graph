@@ -6,13 +6,13 @@ import logging
 import threading
 from contextlib import asynccontextmanager
 
-from fastapi import Body, FastAPI, HTTPException
+from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from . import bulk, crud, db, graph
+from . import auth, bulk, crud, db, graph
 from .events import hub, router as events_router
-from .netbox import NetBox, NetBoxError
+from .netbox import NetBox, NetBoxError, request_token
 from .provision import ProvisionError, add_ont, deprovision_service, interface_services, provision_service
 from .settings import get_settings
 
@@ -43,6 +43,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title='nb_graph API', version='0.1.0', lifespan=lifespan,
               description='Graph projection of NetBox (PostgreSQL 19) with CRUD + service provisioning')
+app.add_middleware(auth.AuthMiddleware)  # inner: CORS (added last = outermost) also wraps 401s
 app.add_middleware(CORSMiddleware, allow_origins=get_settings().cors_origins.split(','),
                    allow_methods=['*'], allow_headers=['*'])
 app.include_router(graph.router)
@@ -58,7 +59,8 @@ async def provision_error(_, exc: ProvisionError):
 @app.get('/api/health')
 def health():
     s = get_settings()
-    out = {'graph_schema': state['graph_schema'], 'netbox_public_url': s.netbox_public_url}
+    out = {'graph_schema': state['graph_schema'], 'netbox_public_url': s.netbox_public_url,
+           'auth': auth.public_config()}
     try:
         out['postgres'] = db.server_version()
     except Exception as exc:  # noqa: BLE001
@@ -68,6 +70,12 @@ def health():
     except Exception as exc:  # noqa: BLE001
         out['netbox'] = f'error: {exc.__class__.__name__}'
     return out
+
+
+@app.get('/api/me', tags=['auth'])
+def me(request: Request):
+    user = getattr(request.state, 'user', None)
+    return {'auth': auth.public_config()['mode'], 'user': user.public() if user else None}
 
 
 @app.post('/api/admin/graph/install')
@@ -148,9 +156,10 @@ def bulk_start(body: dict = Body(..., examples=[{'scope': 'site:1', 'service': '
         hub.publish({'source': 'nb_graph', 'event': item['status'], 'kind': 'interface',
                      'id': f'interface:{item["interface_id"]}', 'display': item.get('device')})
 
+    token = request_token.get()  # the job thread doesn't inherit contextvars: hand it the caller's token
     return bulk.start(targets, service, scope=body.get('scope'), tenant_id=body.get('tenant_id'),
                       description=body.get('description', ''), stop_on_error=bool(body.get('stop_on_error')),
-                      on_item=on_item)
+                      on_item=on_item, nb_factory=lambda: NetBox(token=token))
 
 
 @app.get('/api/provision/bulk', tags=['provision'])

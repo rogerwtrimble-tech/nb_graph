@@ -286,6 +286,24 @@ class Seeder:
                 except ProvisionError as exc:
                     log.warning('  ! %s on %s:%s skipped: %s', svc, ont['name'], iname, exc)
 
+    def permissions(self):
+        """NetBox groups that OIDC users are mapped into (AUTH_MODE=oidc): editors may change everything nb_graph
+        touches, viewers may only read. Re-running refreshes the object type list."""
+        nb = self.nb
+        types = sorted(f"{t['app_label']}.{t['model']}"
+                       for app in ('dcim', 'ipam', 'circuits', 'tenancy', 'netbox_numbers')
+                       for t in nb.list('core/object-types/', app_label=app))
+        for group, actions in (('nbgraph-editors', ['view', 'add', 'change', 'delete']),
+                               ('nbgraph-viewers', ['view'])):
+            grp = self.goc('users/groups/', {'name': group}, {'name': group, 'description': 'nb_graph OIDC role'})
+            body = {'name': group, 'enabled': True, 'object_types': types, 'actions': actions, 'groups': [grp['id']],
+                    'description': f'nb_graph: {"read/write" if len(actions) > 1 else "read-only"} on network objects'}
+            perm = nb.first('users/permissions/', name=group)
+            if perm:
+                nb.patch(f'users/permissions/{perm["id"]}/', body)
+            else:
+                nb.post('users/permissions/', body)
+
     def webhook(self, url: str, secret: str):
         """NetBox event rule -> webhook -> nb_graph, so edits made in NetBox's own UI update the graph live."""
         nb = self.nb
@@ -311,6 +329,8 @@ class Seeder:
             self.site(*spec)
         log.info('sample services')
         self.services()
+        log.info('OIDC role groups and permissions')
+        self.permissions()
         if webhook_url:
             self.webhook(webhook_url, secret)
         log.info('seed complete in %.1fs', time.time() - t0)

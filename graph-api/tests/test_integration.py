@@ -1,7 +1,9 @@
 """
 Integration tests against a running stack (seeded demo data).
     NBGRAPH_API=http://localhost:8090 python -m pytest -q
-Skipped automatically when the API is not reachable.
+Skipped automatically when the API is not reachable. With AUTH_MODE=oidc the suite signs in through the
+demo Keycloak realm (password grant) as NBGRAPH_TEST_USER (default alice, an editor) and also runs the
+auth tests at the bottom.
 """
 import os
 
@@ -19,7 +21,24 @@ def _up():
 
 
 pytestmark = pytest.mark.skipif(not _up(), reason=f'nb_graph API not reachable at {API}')
-c = httpx.Client(base_url=API, timeout=60)
+AUTH = httpx.get(f'{API}/api/health', timeout=5).json().get('auth', {}) if _up() else {}
+OIDC = AUTH.get('mode') == 'oidc'
+
+
+def oidc_token(user: str, password: str | None = None) -> str:
+    r = httpx.post(f"{AUTH['issuer']}/protocol/openid-connect/token", timeout=20, data={
+        'grant_type': 'password', 'client_id': AUTH['client_id'], 'username': user,
+        'password': password or user, 'scope': 'openid'})
+    r.raise_for_status()
+    return r.json()['access_token']
+
+
+def client_for(user: str | None) -> httpx.Client:
+    headers = {'Authorization': f'Bearer {oidc_token(user)}'} if user else {}
+    return httpx.Client(base_url=API, timeout=60, headers=headers)
+
+
+c = client_for(os.environ.get('NBGRAPH_TEST_USER', 'alice') if OIDC else None)
 
 
 def test_health_reports_pg19_and_netbox():
@@ -132,12 +151,11 @@ def test_bulk_plan_rejects_bad_scope_and_service():
 
 def test_bulk_job_provisions_every_target_then_cleanup():
     import time
-    ont = c.get('/api/graph/search', params={'q': 'aus-ont-0002', 'kinds': 'device'}).json()['results'][0]
+    site = c.get('/api/graph/search', params={'q': 'Austin CO', 'kinds': 'site'}).json()['results'][0]
+    free = _plan(site['id'], 'hsi')['targets']
+    assert free, 'demo data should leave some Austin wan0 ports free'
+    ont = {'id': f"device:{free[0]['device_id']}"}
     plan = _plan(ont['id'], 'hsi')
-    if not plan['targets']:  # left over from an aborted run: free the port first
-        wan = next(n for n in c.get(f"/api/graph/expand/{ont['id']}").json()['nodes'] if n['label'] == 'wan0')
-        c.delete(f"/api/provision/service/{wan['nb_id']}")
-        plan = _plan(ont['id'], 'hsi')
     assert len(plan['targets']) == 1
     job = c.post('/api/provision/bulk', json={'scope': ont['id'], 'service': 'hsi'})
     assert job.status_code == 202, job.text
@@ -153,3 +171,39 @@ def test_bulk_job_provisions_every_target_then_cleanup():
     assert c.post('/api/provision/bulk', json={'scope': ont['id'], 'service': 'hsi'}).status_code == 409
     assert any(x['id'] == jid for x in c.get('/api/provision/bulk').json()['jobs'])
     assert c.delete(f"/api/provision/service/{plan['targets'][0]['interface_id']}").status_code == 200
+
+
+# ------------------------------------------------------------------------------------------- OIDC
+oidc_only = pytest.mark.skipif(not OIDC, reason='stack runs with AUTH_MODE=none')
+
+
+@oidc_only
+def test_oidc_rejects_anonymous_and_outsiders():
+    assert httpx.get(f'{API}/api/graph/roots').status_code == 401
+    assert client_for('carol').get('/api/graph/roots').status_code == 403   # in no nb_graph group
+
+
+@oidc_only
+def test_oidc_viewer_reads_but_netbox_refuses_writes():
+    bob = client_for('bob')
+    assert bob.get('/api/me').json()['user']['groups'] == ['nbgraph-viewers']
+    assert bob.get('/api/graph/roots').status_code == 200
+    r = bob.post('/api/object/region', json={'name': 'Viewer Region', 'slug': 'viewer-region'})
+    assert r.status_code == 403
+
+
+@oidc_only
+def test_oidc_editor_writes_are_attributed_in_netbox_changelog():
+    alice = client_for('alice')
+    reg = alice.post('/api/object/region', json={'name': 'OIDC Test Region', 'slug': 'oidc-test-region'})
+    assert reg.status_code in (200, 201), reg.text
+    rid = reg.json()['id']
+    try:
+        nb_url = os.environ.get('NBGRAPH_NETBOX_URL', 'http://localhost:8000')
+        nb_token = os.environ.get('NBGRAPH_NETBOX_TOKEN', 'nbt_nbgraphdemo1.0123456789abcdef0123456789abcdef01234567')
+        changes = httpx.get(f'{nb_url}/api/core/object-changes/', headers={'Authorization': f'Bearer {nb_token}'},
+                            params={'changed_object_type': 'dcim.region', 'changed_object_id': rid}).json()
+        users = {ch['user_name'] for ch in changes.get('results', [])}
+        assert users == {'alice'}, changes
+    finally:
+        alice.delete(f'/api/object/region/{rid}')

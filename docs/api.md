@@ -10,6 +10,17 @@ OpenAPI is at **`/docs`**. Node ids are `kind:id`, e.g. `device:42`, `interface:
 | GET | `/api/health` | `{graph_schema, postgres, netbox, netbox_public_url}` |
 | POST | `/api/admin/graph/install` | re-apply `db/graph/0*.sql` |
 
+## Auth
+
+With `AUTH_MODE=oidc` every `/api/*` call except `/api/health` and the NetBox webhook needs
+`Authorization: Bearer <OIDC access token>` (`?access_token=` for `/api/events/stream`). See [auth.md](auth.md).
+
+| Method | Path | Returns |
+|---|---|---|
+| GET | `/api/me` | `{auth: none\|oidc, user: {username, email, name, groups} \| null}` |
+
+`/api/health` also returns `auth: {mode, issuer?, client_id?}` so the UI knows how to sign in.
+
 ## Graph (read, SQL)
 
 | Method | Path | Query params | Returns |

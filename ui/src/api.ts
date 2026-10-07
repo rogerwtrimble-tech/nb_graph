@@ -1,4 +1,5 @@
 // Typed client for the nb_graph API (graph-api service). All calls are same-origin: /api/...
+import { accessToken, reauthenticate } from './auth'
 
 export type Lens = 'service' | 'physical' | 'inventory' | 'all'
 
@@ -103,6 +104,7 @@ export interface SiteMap {
 }
 
 export interface Health {
+  auth?: { mode: 'none' | 'oidc'; issuer?: string; client_id?: string }
   graph_schema: string
   netbox_public_url: string
   postgres: string
@@ -132,11 +134,12 @@ export class ApiError extends Error {
 }
 
 async function call<T>(method: string, url: string, body?: unknown): Promise<T> {
-  const res = await fetch(url, {
-    method,
-    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
-  })
+  const headers: Record<string, string> = {}
+  if (body !== undefined) headers['Content-Type'] = 'application/json'
+  const token = accessToken()
+  if (token) headers.Authorization = `Bearer ${token}`
+  const res = await fetch(url, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined })
+  if (res.status === 401 && token) reauthenticate()
   const text = await res.text()
   const data = text ? JSON.parse(text) : null
   if (!res.ok) throw new ApiError(res.status, data)

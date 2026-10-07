@@ -24,12 +24,14 @@ import BulkProvisionDialog from './components/BulkProvisionDialog'
 import NodeMenu, { type MenuAction } from './components/NodeMenu'
 import SearchBox from './components/SearchBox'
 import { useLiveEvents, type ChangeEvent } from './useLiveEvents'
+import { signOut, type AuthInfo } from './auth'
+import LogoutIcon from '@mui/icons-material/Logout'
 
 const LEFT = 290
 const RIGHT = 430
 const CABLE_LABELS = 'HAS_INTERFACE,HAS_PORT,MAPS,CABLED,PART_OF'
 
-export default function App() {
+export default function App({ auth }: { auth: AuthInfo }) {
   const prefersDark = useMediaQuery('(prefers-color-scheme: dark)')
   const [dark, setDark] = useState<boolean>(prefersDark)
   const theme = useMemo(() => createTheme({
@@ -260,6 +262,13 @@ export default function App() {
           <Tooltip title="Export PNG"><IconButton onClick={exportPng}><ImageIcon /></IconButton></Tooltip>
           <Tooltip title="Toggle theme"><IconButton onClick={() => setDark((d) => !d)}>{dark ? <LightModeIcon /> : <DarkModeIcon />}</IconButton></Tooltip>
           <Tooltip title="Open NetBox"><IconButton href={netboxUrl} target="_blank"><OpenInNewIcon /></IconButton></Tooltip>
+          {auth.user && (
+            <Tooltip title={`${auth.user.email} · ${auth.user.groups.join(', ') || 'no groups'} · writes go to NetBox as you`}>
+              <Chip size="small" color={auth.user.groups.includes('nbgraph-editors') ? 'primary' : 'default'}
+                label={`${auth.user.name || auth.user.username}${auth.user.groups.includes('nbgraph-editors') ? '' : ' · read-only'}`}
+                onDelete={signOut} deleteIcon={<LogoutIcon />} />
+            </Tooltip>
+          )}
         </Toolbar>
       </AppBar>
 
