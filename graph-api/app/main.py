@@ -10,7 +10,7 @@ from fastapi import Body, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from . import crud, db, graph
+from . import bulk, crud, db, graph
 from .events import hub, router as events_router
 from .netbox import NetBox, NetBoxError
 from .provision import ProvisionError, add_ont, deprovision_service, interface_services, provision_service
@@ -118,3 +118,57 @@ def provision_ont(body: dict = Body(..., examples=[{'pon_interface_id': 11, 'ser
     hub.publish({'source': 'nb_graph', 'event': 'updated', 'kind': 'interface',
                  'id': f'interface:{body["pon_interface_id"]}'})
     return res
+
+
+# ------------------------------------------------------------------------------------------- bulk
+@app.post('/api/provision/bulk/plan', tags=['provision'])
+def bulk_plan(body: dict = Body(..., examples=[{'scope': 'site:1', 'service': 'hsi'}])):
+    """Dry run: the free ONT ports under a region / site / OLT / PON port / ONT that fit the service."""
+    if 'scope' not in body or 'service' not in body:
+        raise HTTPException(422, 'scope and service are required')
+    return bulk.plan(body['scope'], body['service'], int(body.get('limit', bulk.MAX_TARGETS)))
+
+
+@app.post('/api/provision/bulk', status_code=202, tags=['provision'])
+def bulk_start(body: dict = Body(..., examples=[{'scope': 'site:1', 'service': 'hsi', 'limit': 10}])):
+    """Start a background job. Give either a scope (planned server-side) or explicit interface_ids."""
+    service = body.get('service')
+    if not service:
+        raise HTTPException(422, 'service is required')
+    if body.get('interface_ids'):
+        targets = [{'interface_id': int(i)} for i in body['interface_ids']][:bulk.MAX_TARGETS]
+    elif body.get('scope'):
+        targets = bulk.plan(body['scope'], service, int(body.get('limit', bulk.MAX_TARGETS)))['targets']
+    else:
+        raise HTTPException(422, 'scope or interface_ids is required')
+    if not targets:
+        raise HTTPException(409, 'nothing to provision: no free eligible ports in that scope')
+
+    def on_item(item: dict):
+        hub.publish({'source': 'nb_graph', 'event': item['status'], 'kind': 'interface',
+                     'id': f'interface:{item["interface_id"]}', 'display': item.get('device')})
+
+    return bulk.start(targets, service, scope=body.get('scope'), tenant_id=body.get('tenant_id'),
+                      description=body.get('description', ''), stop_on_error=bool(body.get('stop_on_error')),
+                      on_item=on_item)
+
+
+@app.get('/api/provision/bulk', tags=['provision'])
+def bulk_jobs():
+    return {'jobs': bulk.list_jobs()}
+
+
+@app.get('/api/provision/bulk/{job_id}', tags=['provision'])
+def bulk_job(job_id: str):
+    job = bulk.get_job(job_id)
+    if not job:
+        raise HTTPException(404, f'no bulk job {job_id}')
+    return job
+
+
+@app.post('/api/provision/bulk/{job_id}/cancel', tags=['provision'])
+def bulk_cancel(job_id: str):
+    job = bulk.cancel(job_id)
+    if not job:
+        raise HTTPException(404, f'no bulk job {job_id}')
+    return job

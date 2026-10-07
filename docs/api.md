@@ -59,6 +59,11 @@ NetBox validation errors come back as `400 {"detail": "NetBox rejected the reque
 | POST | `/api/provision/service` | `{interface_id, service: hsi\|voip\|ethernet, tenant_id?, tenant_name?, description?}` |
 | DELETE | `/api/provision/service/{interface_id}` | `?vc_id=` (optional: only that service) |
 | POST | `/api/provision/ont` | `{pon_interface_id, serial?, name?}` |
+| POST | `/api/provision/bulk/plan` | `{scope, service, limit?}`: dry run. `scope` is a node id: `region:`, `site:`, OLT `device:`, OLT PON `interface:` or ONT `device:`. Returns `onts`, `eligible`, `already_provisioned`, `targets[]` |
+| POST | `/api/provision/bulk` | `{scope \| interface_ids[], service, tenant_id?, description?, stop_on_error?, limit?}` → **202** job `{id, status, total, done, ok, failed, results[]}`. Returns 409 if nothing is left to provision |
+| GET | `/api/provision/bulk` | recent jobs (the last 20, held in memory) |
+| GET | `/api/provision/bulk/{job_id}` | job progress and per-port results (`cid` or `error`) |
+| POST | `/api/provision/bulk/{job_id}/cancel` | stop after the current port |
 
 ## Events
 

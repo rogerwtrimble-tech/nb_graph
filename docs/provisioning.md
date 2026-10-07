@@ -59,6 +59,25 @@ sequenceDiagram
 termination), deletes the service IPs, releases DIDs back to `available`, and either deletes the Business
 Ethernet sub-interface and its C-VLAN or resets the access VLAN on the port.
 
+## Bulk provisioning
+
+Right-click a **region, site, OLT, OLT PON port or ONT** → **Bulk provision…**, then pick a service.
+
+1. **Plan (dry run).** `POST /api/provision/bulk/plan` resolves the scope to ONTs in SQL: region tree (ltree
+   `<@`) → sites → ONTs, or OLT/PON → `FEEDS` (NetBox's completed cable paths through the splitters) → ONTs.
+   It then keeps the top-level ONT ports that fit the service and have no virtual circuit yet (on the port
+   or any of its sub-interfaces). Nothing is written.
+2. **Run.** `POST /api/provision/bulk` starts a background job that calls the same saga as single-port
+   provisioning, one port at a time. **Each port is atomic**: a failure rolls back only that port, and the job
+   carries on unless *stop at the first failure* is set. Jobs can be cancelled between ports.
+3. **Progress.** The dialog polls `GET /api/provision/bulk/{id}`. Every port is also published as a live event,
+   so open graphs and the map update while the job runs.
+
+Each ONT gets its own auto-named subscriber tenant (or keeps the one it has), the same as single provisioning.
+Pass `tenant_id` through the API to put every service under one tenant. A job is capped at 500 ports.
+Jobs live in graph-api's memory, so a restart forgets finished jobs (the NetBox changes themselves are
+permanent and show in NetBox's change log).
+
 ## Adding an ONT from the graph
 
 `POST /api/provision/ont {pon_interface_id, serial?, name?}` (UI: click a PON port → *Add* → **Add ONT**):

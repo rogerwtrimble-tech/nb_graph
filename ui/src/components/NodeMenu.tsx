@@ -11,11 +11,13 @@ import CenterFocusStrongIcon from '@mui/icons-material/CenterFocusStrong'
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
 import CableIcon from '@mui/icons-material/Cable'
+import DynamicFeedIcon from '@mui/icons-material/DynamicFeed'
 import type { GNode } from '../api'
+import { isBulkScope } from './BulkProvisionDialog'
 
 export type MenuAction =
   | 'expand' | 'expand3' | 'collapse' | 'parents' | 'provision' | 'add' | 'edit' | 'trace' | 'path-root'
-  | 'focus' | 'hide' | 'netbox' | 'cable-trace'
+  | 'focus' | 'hide' | 'netbox' | 'cable-trace' | 'bulk'
 
 export default function NodeMenu({ anchor, node, expanded, onClose, onAction }: {
   anchor: { x: number; y: number } | null
@@ -44,6 +46,7 @@ export default function NodeMenu({ anchor, node, expanded, onClose, onAction }: 
       {item('parents', <NorthIcon fontSize="small" />, 'Reveal parents / referrers')}
       <Divider />
       {isOntPort && item('provision', <BoltIcon fontSize="small" color="warning" />, 'Provision service…')}
+      {isBulkScope(node) && item('bulk', <DynamicFeedIcon fontSize="small" color="warning" />, 'Bulk provision…', 'every free port below this node')}
       {item('add', <AddIcon fontSize="small" />, 'Add child…')}
       {item('edit', <EditIcon fontSize="small" />, 'Edit…')}
       <Divider />

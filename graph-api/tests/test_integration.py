@@ -103,3 +103,53 @@ def test_map_places_seeded_sites_and_backhaul_links():
     hub_links = {l['a_site_id'] for l in m['links'] if l['z_site_id'] == chi['id']}
     assert {sites[s]['id'] for s in ('npv-co-01', 'mke-co-01', 'aus-co-01')} <= hub_links
     assert m['unplaced'] == sum(1 for s in m['sites'] if s['latitude'] is None)
+
+
+def _plan(scope, service):
+    r = c.post('/api/provision/bulk/plan', json={'scope': scope, 'service': service})
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def test_bulk_plan_scopes_agree():
+    site = c.get('/api/graph/search', params={'q': 'Milwaukee CO', 'kinds': 'site'}).json()['results'][0]
+    olt = next(n for n in c.get(f"/api/graph/expand/{site['id']}").json()['nodes'] if n['subtype'] == 'olt')
+    pons = [n for n in c.get(f"/api/graph/expand/{olt['id']}").json()['nodes']
+            if n['props'].get('service_class') == 'pon']
+    by_site, by_olt = _plan(site['id'], 'voip'), _plan(olt['id'], 'voip')
+    by_pons = [_plan(p['id'], 'voip') for p in pons]
+    # Milwaukee has one OLT, so site, OLT and the sum of its PON ports all see the same ONTs and ports
+    assert by_site['onts'] == by_olt['onts'] == sum(p['onts'] for p in by_pons) > 0
+    assert {t['interface_id'] for t in by_site['targets']} == {t['interface_id'] for t in by_olt['targets']}
+    assert all(t['interface'].startswith('voip') for t in by_site['targets'])
+    assert by_site['eligible'] == by_site['already_provisioned'] + len(by_site['targets'])
+
+
+def test_bulk_plan_rejects_bad_scope_and_service():
+    assert c.post('/api/provision/bulk/plan', json={'scope': 'tenant:1', 'service': 'hsi'}).status_code == 400
+    assert c.post('/api/provision/bulk/plan', json={'scope': 'site:1', 'service': 'iptv'}).status_code == 400
+
+
+def test_bulk_job_provisions_every_target_then_cleanup():
+    import time
+    ont = c.get('/api/graph/search', params={'q': 'aus-ont-0002', 'kinds': 'device'}).json()['results'][0]
+    plan = _plan(ont['id'], 'hsi')
+    if not plan['targets']:  # left over from an aborted run: free the port first
+        wan = next(n for n in c.get(f"/api/graph/expand/{ont['id']}").json()['nodes'] if n['label'] == 'wan0')
+        c.delete(f"/api/provision/service/{wan['nb_id']}")
+        plan = _plan(ont['id'], 'hsi')
+    assert len(plan['targets']) == 1
+    job = c.post('/api/provision/bulk', json={'scope': ont['id'], 'service': 'hsi'})
+    assert job.status_code == 202, job.text
+    jid = job.json()['id']
+    for _ in range(60):
+        j = c.get(f'/api/provision/bulk/{jid}').json()
+        if j['status'] != 'running':
+            break
+        time.sleep(0.5)
+    assert j['status'] == 'done' and j['ok'] == 1 and j['failed'] == 0, j
+    assert j['results'][0]['cid'].startswith('HSI-AUS-')
+    assert _plan(ont['id'], 'hsi')['targets'] == []          # now provisioned, so nothing left to plan
+    assert c.post('/api/provision/bulk', json={'scope': ont['id'], 'service': 'hsi'}).status_code == 409
+    assert any(x['id'] == jid for x in c.get('/api/provision/bulk').json()['jobs'])
+    assert c.delete(f"/api/provision/service/{plan['targets'][0]['interface_id']}").status_code == 200

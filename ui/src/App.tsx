@@ -20,6 +20,7 @@ import { GraphController, type LayoutName } from './graph/controller'
 import Inspector from './components/Inspector'
 import LeftPanel from './components/LeftPanel'
 import MapView from './components/MapView'
+import BulkProvisionDialog from './components/BulkProvisionDialog'
 import NodeMenu, { type MenuAction } from './components/NodeMenu'
 import SearchBox from './components/SearchBox'
 import { useLiveEvents, type ChangeEvent } from './useLiveEvents'
@@ -48,6 +49,7 @@ export default function App() {
   const [leftOpen, setLeftOpen] = useState(true)
   const [selected, setSelected] = useState<GNode | null>(null)
   const [menu, setMenu] = useState<{ node: GNode; x: number; y: number } | null>(null)
+  const [bulkNode, setBulkNode] = useState<GNode | null>(null)
   const [traceFrom, setTraceFrom] = useState<GNode | null>(null)
   const traceRef = useRef<GNode | null>(null)
   traceRef.current = traceFrom
@@ -161,6 +163,7 @@ export default function App() {
         case 'collapse': c.collapse(n.id); break
         case 'parents': await c.expand(n.id, 'in'); break
         case 'provision': case 'edit': case 'add': setSelected(n); break
+        case 'bulk': setBulkNode(n); break
         case 'hide': c.hide(n.id); if (selected?.id === n.id) setSelected(null); break
         case 'focus': c.focus(n.id); break
         case 'netbox': window.open(`${netboxUrl}/${n.ui_path}`, '_blank'); break
@@ -282,6 +285,9 @@ export default function App() {
             onAddedChild={(pid) => afterChange([pid]).then(() => ctl.current?.expand(pid)).then(sync).catch(fail)} />
         )}
       </Drawer>
+
+      <BulkProvisionDialog node={bulkNode} onClose={() => setBulkNode(null)}
+        onFinished={(id) => { qc.invalidateQueries({ queryKey: ['map'] }); afterChange([id]) }} />
 
       <NodeMenu anchor={menu} node={menu?.node ?? null} expanded={Boolean(menu && ctl.current?.isExpanded(menu.node.id))}
         onClose={() => setMenu(null)} onAction={onMenu} />

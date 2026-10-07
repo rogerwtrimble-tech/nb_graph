@@ -12,7 +12,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSnackbar } from 'notistack'
 import { api, ApiError, type GNode, type ProvisionResult } from '../api'
 
-const SERVICE_TEXT: Record<string, { title: string; what: string }> = {
+export const SERVICE_TEXT: Record<string, { title: string; what: string }> = {
   hsi: { title: 'High-Speed Internet', what: 'C-VLAN 100 · IP from Subscriber WAN pool · HSI virtual circuit' },
   voip: { title: 'Voice (VOIP)', what: 'C-VLAN 200 · IP from VOIP pool · next free DID · VOIP virtual circuit' },
   ethernet: { title: 'Business Ethernet', what: 'new sub-interface · per-customer C-VLAN (Q-in-Q under the PON S-VLAN) · EVC' },

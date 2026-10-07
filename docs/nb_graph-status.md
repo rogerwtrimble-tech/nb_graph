@@ -29,5 +29,7 @@ Ports: UI 8080, NetBox 8000, API 8090 (/docs), PG 5432.
 ## Roadmap progress
 - **Map view: done (2026-10-07).** `db/graph/050_map.sql` adds the `nbgraph.site_map` and `nbgraph.site_links` views. `GET /api/graph/map` serves them. The UI uses Leaflet + OSM with drag/place to set site lat/long via NetBox, and popup → "Show in graph". The seed now sets coordinates for the 4 demo sites (and back-fills them on re-seed). Integration test added (17/17 pass on the live stack). E2E check with Playwright: 4 markers, 3 circuits, Place writes to NetBox, Show in graph works. OSM tiles couldn't be checked in the sandbox (egress blocked).
 
+- **Bulk provisioning: done (2026-10-07).** `graph-api/app/bulk.py`: the SQL planner (region/site/OLT/PON/ONT scope → free eligible ports) plus a background job runner that reuses the per-port saga (each port atomic, continue or stop on error, cancel). Endpoints are under `/api/provision/bulk*`. UI: node menu → "Bulk provision…" dialog with dry run, progress and results. 3 integration tests (site/OLT/PON plans agree, bad scope/service rejected, job roundtrip with cleanup): 20/20 pass and can be rerun. Browser E2E: Austin CO VOIP, 10/10 ports provisioned, then cleaned up.
+
 ## Next ideas
-Per-user auth (OIDC) · GRAPH_TABLE for fixed-depth queries on PG20 · Helm chart for Rancher Apps · bulk provisioning.
+Per-user auth (OIDC) · GRAPH_TABLE for fixed-depth queries on PG20 · Helm chart for Rancher Apps.

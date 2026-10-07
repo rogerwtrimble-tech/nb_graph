@@ -185,6 +185,11 @@ export const api = {
     call<ProvisionResult>('POST', '/api/provision/service', body),
   deprovision: (interfaceId: number, vcId?: number) =>
     call<ProvisionResult>('DELETE', `/api/provision/service/${interfaceId}${q({ vc_id: vcId })}`),
+  bulkPlan: (scope: string, service: string) => call<BulkPlan>('POST', '/api/provision/bulk/plan', { scope, service }),
+  bulkStart: (body: { scope?: string; interface_ids?: number[]; service: string; stop_on_error?: boolean }) =>
+    call<BulkJob>('POST', '/api/provision/bulk', body),
+  bulkJob: (id: string) => call<BulkJob>('GET', `/api/provision/bulk/${id}`),
+  bulkCancel: (id: string) => call<BulkJob>('POST', `/api/provision/bulk/${id}/cancel`),
   addOnt: (body: { pon_interface_id: number; name?: string; serial?: string }) =>
     call<{ status: string; device: { id: number; name: string }; splitter_port: string; steps: Step[] }>('POST', '/api/provision/ont', body),
 }
@@ -206,4 +211,35 @@ export interface ProvisionResult {
   number?: { id: number; number: string } | null
   tenant?: { id: number; name: string }
   steps: Step[]
+}
+
+export interface BulkTarget {
+  interface_id: number
+  interface: string
+  device: string
+  site: string
+  node_id: string
+}
+
+export interface BulkPlan {
+  scope: string
+  scope_kind: string
+  service: string
+  onts: number
+  eligible: number
+  already_provisioned: number
+  truncated: boolean
+  targets: BulkTarget[]
+}
+
+export interface BulkJob {
+  id: string
+  service: string
+  scope: string | null
+  status: 'running' | 'done' | 'cancelled' | 'stopped'
+  total: number
+  done: number
+  ok: number
+  failed: number
+  results: { interface_id: number; interface?: string; device?: string; status: string; cid?: string; error?: string }[]
 }

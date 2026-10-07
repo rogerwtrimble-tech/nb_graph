@@ -85,6 +85,12 @@ The globe button next to the logo switches to a map of sites, placed by their Ne
 * Sites with no coordinates are listed in the panel. Click **Place**, then click the map.
 * Site, device and circuit changes from anywhere (including NetBox's UI) refresh the map live.
 
+## Bulk provisioning
+
+Right-click a region, site, OLT, OLT PON port or ONT → **Bulk provision…**. Pick a service to see the dry run
+(ONTs in scope, eligible ports, how many already have the service), then **Provision N ports**. A progress bar
+and per-port results (CID or error) update live. See [provisioning.md](provisioning.md#bulk-provisioning).
+
 ## Live updates
 
 The `● live` chip shows the SSE connection. Any change, whether it comes from this UI, another browser, or
