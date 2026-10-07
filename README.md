@@ -101,6 +101,7 @@ nb_graph/
 | [docs/provisioning.md](docs/provisioning.md) | FTTH demo model, service catalogue, provisioning saga and rollback |
 | [docs/ui-guide.md](docs/ui-guide.md) | Using the explorer: gestures, lenses, inspector, CRUD, live updates |
 | [docs/api.md](docs/api.md) | graph-api REST reference with curl examples |
+| [docs/nb_graph-status.md](docs/nb_graph-status.md) | Build status, agreed decisions and next ideas |
 
 ## Built from open source
 
