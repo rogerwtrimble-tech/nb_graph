@@ -33,7 +33,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: azure/setup-helm@v4
-      - run: helm lint charts/nb-graph
+      - run: helm lint charts/nb-graph && helm lint charts/nb-graph -f charts/nb-graph/values-local.yaml
       - run: |
           helm template t charts/nb-graph > /dev/null
           helm template t charts/nb-graph --set auth.mode=oidc --set auth.oidc.issuer=https://idp.example/realms/x \

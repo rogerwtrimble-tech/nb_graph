@@ -20,11 +20,14 @@ app.kubernetes.io/instance: {{ .root.Release.Name }}
 app.kubernetes.io/component: {{ .component }}
 {{- end -}}
 
-{{/* image: registry prefix applies to nb_graph/* and upstream images alike */}}
+{{/* image: nb_graph/* images get image.registry and default to image.tag; upstream images get image.mirror */}}
 {{- define "nbg.image" -}}
-{{- $reg := .root.Values.image.registry -}}
-{{- if $reg -}}{{ printf "%s/%s:%s" (trimSuffix "/" $reg) (.img.repository | trimPrefix "docker.io/") (toString .img.tag) }}
-{{- else -}}{{ printf "%s:%s" .img.repository (toString .img.tag) }}{{- end -}}
+{{- $own := hasPrefix "nb_graph/" .img.repository -}}
+{{- $reg := ternary .root.Values.image.registry .root.Values.image.mirror $own -}}
+{{- $tag := toString (.img.tag | default (ternary .root.Values.image.tag "" $own)) -}}
+{{- $repo := ternary .img.repository (.img.repository | trimPrefix "docker.io/") (empty $reg) -}}
+{{- if $reg -}}{{ printf "%s/%s:%s" (trimSuffix "/" $reg) $repo $tag }}
+{{- else -}}{{ printf "%s:%s" $repo $tag }}{{- end -}}
 {{- end -}}
 
 {{- define "nbg.secretName" -}}

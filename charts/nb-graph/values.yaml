@@ -1,11 +1,13 @@
 # nb_graph Helm chart. The defaults mirror docker-compose.yml and suit Rancher Desktop (k3s + Traefik).
 #
-# Images: by default the chart uses the images `docker compose build` creates (nb_graph/*). On Rancher
-# Desktop with the dockerd (moby) engine, k3s shares Docker's image store, so no registry is needed.
-# Elsewhere, push them to a registry and set image.registry (or each repository).
+# Images: nb_graph's own images (netbox, graph-api, ui) come from GitHub Container Registry, published by
+# .github/workflows/images.yml. To use images built locally with `docker compose build` on Rancher Desktop
+# (dockerd engine, which shares its image store with k3s), add  -f charts/nb-graph/values-local.yaml
 
 image:
-  registry: ""            # e.g. ghcr.io/you  -> ghcr.io/you/nb_graph/graph-api:0.1
+  registry: ghcr.io/rogerwtrimble-tech   # prefix for nb_graph/* images ("" = local image names)
+  tag: main               # default tag for nb_graph/* images: main, sha-<short>, or a release like 0.2.0
+  mirror: ""              # optional registry prefix for the upstream images (postgres, valkey), e.g. a pull-through cache
   pullPolicy: IfNotPresent
   pullSecrets: []
 
@@ -35,7 +37,7 @@ valkey:
   resources: {}
 
 netbox:
-  image: {repository: nb_graph/netbox, tag: 4.7-local}
+  image: {repository: nb_graph/netbox, tag: ""}   # "" = image.tag
   superuserName: admin
   superuserEmail: admin@example.com
   timeZone: America/Chicago
@@ -56,11 +58,11 @@ netbox:
   resources: {}
 
 graphApi:
-  image: {repository: nb_graph/graph-api, tag: "0.1"}
+  image: {repository: nb_graph/graph-api, tag: ""}
   resources: {}
 
 ui:
-  image: {repository: nb_graph/ui, tag: "0.1"}
+  image: {repository: nb_graph/ui, tag: ""}
   resources: {}
 
 seed:

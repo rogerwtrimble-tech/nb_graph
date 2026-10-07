@@ -2,6 +2,8 @@
 # nb_graph: self-contained demo stack for Rancher Desktop (dockerd / moby engine) or any Docker Engine
 #
 #   docker compose up -d --build        then open  UI http://localhost:8080   NetBox http://localhost:8000
+#   (or skip the build: NBGRAPH_IMAGES=ghcr.io/rogerwtrimble-tech/nb_graph NBGRAPH_TAG=main in .env, then
+#    docker compose pull netbox graph-api ui && docker compose up -d --no-build)
 #
 #   postgres (PG19) <── netbox + netbox-worker (NetBox 4.7 + netbox_numbers plugin)
 #        ^                    ^   │ webhooks (event rules)
@@ -18,7 +20,7 @@ x-netbox: &netbox
     dockerfile: netbox/Dockerfile
     args:
       NETBOX_IMAGE: ${NETBOX_IMAGE:-docker.io/netboxcommunity/netbox:v4.7-5.1.1}
-  image: nb_graph/netbox:4.7-local
+  image: ${NBGRAPH_IMAGES:-nb_graph}/netbox:${NBGRAPH_TAG:-4.7-local}
   env_file: netbox/env/netbox.env
   environment:
     DB_PASSWORD: ${DB_PASSWORD}
@@ -117,7 +119,7 @@ services:
     build:
       context: .
       dockerfile: graph-api/Dockerfile
-    image: nb_graph/graph-api:0.1
+    image: ${NBGRAPH_IMAGES:-nb_graph}/graph-api:${NBGRAPH_TAG:-0.1}
     environment:
       DATABASE_URL: postgresql://netbox:${DB_PASSWORD}@postgres:5432/netbox
       NETBOX_URL: http://netbox:8080
@@ -140,7 +142,7 @@ services:
     build:                      # same image as graph-api (built once, cached)
       context: .
       dockerfile: graph-api/Dockerfile
-    image: nb_graph/graph-api:0.1
+    image: ${NBGRAPH_IMAGES:-nb_graph}/graph-api:${NBGRAPH_TAG:-0.1}
     command: ["python", "-m", "app.seed"]
     environment:
       NETBOX_URL: http://netbox:8080
@@ -156,7 +158,7 @@ services:
     build:
       context: .
       dockerfile: ui/Dockerfile
-    image: nb_graph/ui:0.1
+    image: ${NBGRAPH_IMAGES:-nb_graph}/ui:${NBGRAPH_TAG:-0.1}
     depends_on:
       graph-api: { condition: service_started }
     ports:

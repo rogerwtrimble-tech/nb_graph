@@ -1,0 +1,78 @@
+# Build and publish the nb_graph images to GitHub Container Registry:
+#   ghcr.io/<owner>/nb_graph/{netbox,graph-api,ui}
+# Tags: "main" + "sha-<short>" on pushes to main, "X.Y.Z" / "X.Y" / "latest" on v* tags.
+# Pull requests build (amd64 only) without pushing.
+name: images
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths:
+      - graph-api/**
+      - db/graph/**
+      - ui/**
+      - netbox/**
+      - plugins/**
+      - .github/workflows/images.yml
+  pull_request:
+    paths:
+      - graph-api/**
+      - db/graph/**
+      - ui/**
+      - netbox/**
+      - plugins/**
+      - .github/workflows/images.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {image: netbox, file: netbox/Dockerfile}
+          - {image: graph-api, file: graph-api/Dockerfile}
+          - {image: ui, file: ui/Dockerfile}
+    env:
+      PUSH: ${{ github.event_name != 'pull_request' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        if: env.PUSH == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/nb_graph/${{ matrix.image }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=sha-
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+          labels: |
+            org.opencontainers.image.title=nb_graph ${{ matrix.image }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          platforms: ${{ env.PUSH == 'true' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+          push: ${{ env.PUSH == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}

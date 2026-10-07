@@ -1,0 +1,11 @@
+# Images built locally with `docker compose build` (Rancher Desktop with the dockerd engine shares them with k3s):
+#   helm install nb-graph charts/nb-graph -f charts/nb-graph/values-local.yaml -n nb-graph --create-namespace
+image:
+  registry: ""
+  pullPolicy: IfNotPresent
+netbox:
+  image: {repository: nb_graph/netbox, tag: 4.7-local}
+graphApi:
+  image: {repository: nb_graph/graph-api, tag: "0.1"}
+ui:
+  image: {repository: nb_graph/ui, tag: "0.1"}

@@ -42,6 +42,10 @@ docker compose logs -f seed          # wait for "seed complete"
 | http://localhost:8090/docs | graph-api OpenAPI (Swagger) | – |
 | `localhost:5432` | PostgreSQL 19 (`netbox`/`$DB_PASSWORD`) | `make psql` |
 
+**Skip the build:** prebuilt amd64/arm64 images are published to GHCR on every push to `main`. Put
+`NBGRAPH_IMAGES=ghcr.io/rogerwtrimble-tech/nb_graph` and `NBGRAPH_TAG=main` in `.env`, then run
+`docker compose pull netbox graph-api ui && docker compose up -d --no-build`.
+
 Rancher Desktop must use the **dockerd (moby)** container engine. The step-by-step setup is in
 **[docs/docker-setup.md](docs/docker-setup.md)**.
 

@@ -24,10 +24,16 @@ questions:
     default: ClusterIP
     group: Access
   - variable: image.registry
-    label: Image registry
-    description: Leave empty on Rancher Desktop (dockerd engine) after `docker compose build`. Otherwise the registry holding nb_graph/* images.
+    label: Registry for nb_graph images
+    description: Published images live in ghcr.io/rogerwtrimble-tech. Empty = images built locally with `docker compose build` (Rancher Desktop, dockerd engine; then also set the tags as in values-local.yaml).
     type: string
-    default: ""
+    default: ghcr.io/rogerwtrimble-tech
+    group: Images
+  - variable: image.tag
+    label: nb_graph image tag
+    description: main (latest build of the main branch), sha-<commit>, or a release such as 0.2.0
+    type: string
+    default: main
     group: Images
   - variable: seed.demoData
     label: Load the FTTH demo network

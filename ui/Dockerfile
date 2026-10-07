@@ -1,5 +1,6 @@
 # nb_graph UI: React + Vite build served by nginx (also reverse-proxies /api to graph-api).
-FROM docker.io/node:22-alpine AS build
+# The static build is platform independent: run it natively even when building an arm64 image.
+FROM --platform=$BUILDPLATFORM docker.io/node:22-alpine AS build
 WORKDIR /ui
 COPY ui/package.json ui/package-lock.json ./
 RUN npm ci --no-audit --no-fund
