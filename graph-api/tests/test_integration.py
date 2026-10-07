@@ -91,3 +91,15 @@ def test_validation_errors_surface_netbox_detail():
     r = c.post('/api/object/site', json={'name': 'no slug'})
     assert r.status_code == 400
     assert 'slug' in r.json()['netbox']
+
+
+def test_map_places_seeded_sites_and_backhaul_links():
+    m = c.get('/api/graph/map').json()
+    sites = {s['slug']: s for s in m['sites']}
+    chi = sites['chi-co-01']
+    assert chi['latitude'] == pytest.approx(41.8781) and chi['longitude'] == pytest.approx(-87.6298)
+    assert chi['roles'].get('bng') == 1 and chi['devices'] > 0 and chi['node_id'] == f"site:{chi['id']}"
+    # every non-hub site has a metro backhaul circuit to the hub
+    hub_links = {l['a_site_id'] for l in m['links'] if l['z_site_id'] == chi['id']}
+    assert {sites[s]['id'] for s in ('npv-co-01', 'mke-co-01', 'aus-co-01')} <= hub_links
+    assert m['unplaced'] == sum(1 for s in m['sites'] if s['latitude'] is None)

@@ -23,6 +23,7 @@ OpenAPI is at **`/docs`**. Node ids are `kind:id`, e.g. `device:42`, `interface:
 | GET | `/api/graph/search` | `q`, `kinds=a,b`, `limit` | vertices whose label/props match |
 | GET | `/api/graph/subgraph` | `ids=a,b,c`, `lens` | the vertices + edges among them, `missing[]` |
 | GET | `/api/graph/stats` | – | counts per kind/label, PG version |
+| GET | `/api/graph/map` | – | `sites[]` (lat/long, device count, `roles{}`, active `services`, `node_id`), `links[]` (circuits whose A and Z ends are on two different placed sites), `unplaced` count |
 
 Graph payload:
 

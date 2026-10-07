@@ -11,12 +11,15 @@ import DarkModeIcon from '@mui/icons-material/DarkMode'
 import LightModeIcon from '@mui/icons-material/LightMode'
 import ImageIcon from '@mui/icons-material/Image'
 import OpenInNewIcon from '@mui/icons-material/OpenInNew'
-import { useQuery } from '@tanstack/react-query'
+import AccountTreeIcon from '@mui/icons-material/AccountTree'
+import PublicIcon from '@mui/icons-material/Public'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSnackbar } from 'notistack'
-import { api, ApiError, type GNode, type Lens } from './api'
+import { api, ApiError, type GNode, type Lens, type MapSite } from './api'
 import { GraphController, type LayoutName } from './graph/controller'
 import Inspector from './components/Inspector'
 import LeftPanel from './components/LeftPanel'
+import MapView from './components/MapView'
 import NodeMenu, { type MenuAction } from './components/NodeMenu'
 import SearchBox from './components/SearchBox'
 import { useLiveEvents, type ChangeEvent } from './useLiveEvents'
@@ -38,6 +41,8 @@ export default function App() {
   const { enqueueSnackbar } = useSnackbar()
   const containerRef = useRef<HTMLDivElement>(null)
   const ctl = useRef<GraphController | null>(null)
+  const qc = useQueryClient()
+  const [view, setView] = useState<'graph' | 'map'>('graph')
   const [lens, setLens] = useState<Lens>('service')
   const [layout, setLayout] = useState<LayoutName>('dagre')
   const [leftOpen, setLeftOpen] = useState(true)
@@ -104,6 +109,9 @@ export default function App() {
 
   // ---------------------------------------------------------------------------------- live updates
   const live = useLiveEvents(async (events: ChangeEvent[]) => {
+    if (events.some((e) => e.kind === 'site' || e.kind === 'device' || e.kind === 'circuit')) {
+      qc.invalidateQueries({ queryKey: ['map'] })
+    }
     const c = ctl.current
     if (!c) return
     const visible = new Set(c.ids())
@@ -135,6 +143,11 @@ export default function App() {
       setSelected(c.node(n.id) ?? n)
       sync()
     } catch (e) { fail(e) }
+  }
+
+  const showSiteInGraph = async (s: MapSite) => {
+    setView('graph')
+    try { await onPick(await api.node(s.node_id, lens)) } catch (e) { fail(e) }
   }
 
   const onMenu = async (a: MenuAction) => {
@@ -215,14 +228,18 @@ export default function App() {
           <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: -0.3, mr: 1, display: { xs: 'none', sm: 'block' } }}>
             nb_graph
           </Typography>
-          <SearchBox onPick={onPick} />
-          <ToggleButtonGroup size="small" exclusive value={lens} onChange={(_, v) => v && changeLens(v)}>
+          <ToggleButtonGroup size="small" exclusive value={view} onChange={(_, v) => v && setView(v)}>
+            <ToggleButton value="graph"><Tooltip title="Graph"><AccountTreeIcon fontSize="small" /></Tooltip></ToggleButton>
+            <ToggleButton value="map"><Tooltip title="Map (site latitude/longitude)"><PublicIcon fontSize="small" /></Tooltip></ToggleButton>
+          </ToggleButtonGroup>
+          <SearchBox onPick={(n) => { setView('graph'); onPick(n) }} />
+          <ToggleButtonGroup size="small" exclusive value={lens} disabled={view === 'map'} onChange={(_, v) => v && changeLens(v)}>
             <ToggleButton value="service">Service</ToggleButton>
             <ToggleButton value="physical">Physical</ToggleButton>
             <ToggleButton value="inventory">Inventory</ToggleButton>
             <ToggleButton value="all">All</ToggleButton>
           </ToggleButtonGroup>
-          <TextField select size="small" value={layout} onChange={(e) => changeLayout(e.target.value as LayoutName)} sx={{ width: 150 }}>
+          <TextField select size="small" value={layout} disabled={view === 'map'} onChange={(e) => changeLayout(e.target.value as LayoutName)} sx={{ width: 150 }}>
             <MenuItem value="dagre">Hierarchy</MenuItem>
             <MenuItem value="fcose">Organic</MenuItem>
             <MenuItem value="breadthfirst">Tree</MenuItem>
@@ -251,6 +268,7 @@ export default function App() {
       <Box sx={{ position: 'fixed', top: 49, bottom: 0, left: leftOpen ? LEFT : 0, right: selected ? RIGHT : 0,
         transition: 'left .2s, right .2s', bgcolor: 'background.default' }}>
         <Box ref={containerRef} sx={{ position: 'absolute', inset: 0 }} />
+        <MapView dark={dark} visible={view === 'map'} onShowInGraph={showSiteInGraph} />
       </Box>
 
       <Drawer variant="persistent" anchor="right" open={Boolean(selected)}

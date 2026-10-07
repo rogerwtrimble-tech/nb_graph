@@ -71,6 +71,37 @@ export interface ServiceInfo {
   }[]
 }
 
+export interface MapSite {
+  id: number
+  node_id: string
+  name: string
+  slug: string
+  status: string
+  facility: string | null
+  region_id: number | null
+  region: string | null
+  latitude: number | null
+  longitude: number | null
+  devices: number
+  roles: Record<string, number>
+  services: number
+}
+
+export interface MapLink {
+  id: number
+  cid: string
+  status: string
+  provider: string
+  a_site_id: number
+  z_site_id: number
+}
+
+export interface SiteMap {
+  sites: MapSite[]
+  links: MapLink[]
+  unplaced: number
+}
+
 export interface Health {
   graph_schema: string
   netbox_public_url: string
@@ -137,6 +168,7 @@ export const api = {
   subgraph: (ids: string[], lens: Lens) => call<Graph>('GET', `/api/graph/subgraph${q({ ids: ids.join(','), lens })}`),
   search: (text: string, kinds?: string) =>
     call<{ results: GNode[] }>('GET', `/api/graph/search${q({ q: text, kinds, limit: 30 })}`),
+  map: () => call<SiteMap>('GET', '/api/graph/map'),
   stats: () => call<{ vertices: Record<string, number>; edges: Record<string, number>; postgres: string }>('GET', '/api/graph/stats'),
 
   schema: (kind: string) => call<Schema>('GET', `/api/schema/${kind}`),

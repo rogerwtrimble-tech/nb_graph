@@ -19,6 +19,7 @@ It ships as one self-contained demo stack (`docker compose`) built for **Rancher
 | **CRUD from the graph** | Create, edit and delete forms are built from NetBox's OPTIONS metadata, and NetBox does all the validation. You can add children in context: a site under a region, an OLT under a site, an ONT under a PON port, an IP under an interface. |
 | **Service provisioning** | Click an ONT `wan0`, `voip1` or `eth1` → **Provision**. One click runs tenant → C-VLAN (Q-in-Q) → IP → DID → virtual circuit. If any step fails, the earlier steps are rolled back automatically. |
 | **Number inventory** | IP prefixes and addresses, VLAN groups and VLANs (S-VLAN/C-VLAN), and telephone numbers (DIDs, through the bundled `netbox_numbers` plugin), all as graph nodes. |
+| **Map view** | Sites placed by NetBox latitude/longitude on an OpenStreetMap base, sized by device count and joined by their site-to-site circuits. Drag or place a site to write its position back to NetBox. Click through to the graph. |
 | **Live updates** | A NetBox event rule sends webhooks to graph-api, which pushes them to the UI over SSE. Edits made in NetBox's own UI show up on open graphs within a second. |
 
 ## Quick start (Rancher Desktop)

@@ -26,5 +26,8 @@ Ports: UI 8080, NetBox 8000, API 8090 (/docs), PG 5432.
 - `pytest` against the live stack: **16/16 pass** (including the provisioning roundtrip, cable trace and CRUD). The UI loads with no JS errors.
 - Sandbox-only workarounds, not repo changes: (1) the build sandbox's TLS proxy CA was injected into image builds; (2) the sandbox kernel has no IPv6, and netbox-docker's `launch-netbox.sh` binds granian to `::`, so it was overridden to `0.0.0.0`. On a host with IPv6 completely disabled, NetBox fails with `Address family not supported by protocol (os error 97)`. Fix: mount a launch script that binds `0.0.0.0`.
 
+## Roadmap progress
+- **Map view: done (2026-10-07).** `db/graph/050_map.sql` adds the `nbgraph.site_map` and `nbgraph.site_links` views. `GET /api/graph/map` serves them. The UI uses Leaflet + OSM with drag/place to set site lat/long via NetBox, and popup → "Show in graph". The seed now sets coordinates for the 4 demo sites (and back-fills them on re-seed). Integration test added (17/17 pass on the live stack). E2E check with Playwright: 4 markers, 3 circuits, Place writes to NetBox, Show in graph works. OSM tiles couldn't be checked in the sandbox (egress blocked).
+
 ## Next ideas
-Per-user auth (OIDC) · GRAPH_TABLE for fixed-depth queries on PG20 · Helm chart for Rancher Apps · bulk provisioning · map view (site lat/long).
+Per-user auth (OIDC) · GRAPH_TABLE for fixed-depth queries on PG20 · Helm chart for Rancher Apps · bulk provisioning.

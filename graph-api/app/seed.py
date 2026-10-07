@@ -38,6 +38,13 @@ SITES = [
     ('mke-co-01', 'Milwaukee CO', 'Wisconsin', 3, '414', 1, 3, False),
     ('aus-co-01', 'Austin CO', 'Texas', 4, '512', 1, 3, False),
 ]
+# Map view positions (WGS84); applied on create, and back-filled on re-seed if a site has none yet.
+SITE_COORDS = {
+    'chi-co-01': (41.878100, -87.629800),
+    'npv-co-01': (41.750800, -88.153500),
+    'mke-co-01': (43.038900, -87.906500),
+    'aus-co-01': (30.267200, -97.743100),
+}
 PONS_USED = 2  # PON ports per OLT that get a splitter
 
 
@@ -124,14 +131,24 @@ class Seeder:
             self.goc('circuits/virtual-circuit-types/', {'slug': slugify(name)}, {'name': name, 'slug': slugify(name)})
 
     # ---------------------------------------------------------------- sites
+    @staticmethod
+    def coords(slug):
+        if slug not in SITE_COORDS:
+            return {}
+        lat, lon = SITE_COORDS[slug]
+        return {'latitude': lat, 'longitude': lon}
+
     def site(self, slug, name, region, idx, area, n_olt, onts_per_spl, hub):
         nb = self.nb
         code = slug.split('-')[0]
         site = self.goc('dcim/sites/', {'slug': slug},
                         {'name': name, 'slug': slug, 'status': 'active', 'region': self.ids[f'region:{region}'],
-                         'facility': f'{code.upper()} Central Office', 'time_zone': 'America/Chicago'},
+                         'facility': f'{code.upper()} Central Office', 'time_zone': 'America/Chicago',
+                         **self.coords(slug)},
                         f'site:{slug}')
         sid = site['id']
+        if site.get('latitude') is None and slug in SITE_COORDS:
+            site = nb.patch(f'dcim/sites/{sid}/', self.coords(slug))
         subs = self.goc('dcim/locations/', {'site_id': sid, 'slug': f'{code}-subscribers'},
                         {'site': sid, 'name': 'Subscriber Premises', 'slug': f'{code}-subscribers', 'status': 'active'})
         scope = {'scope_type': 'dcim.site', 'scope_id': sid}

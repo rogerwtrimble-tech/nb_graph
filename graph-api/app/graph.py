@@ -185,3 +185,15 @@ def subgraph(ids: str = Query(..., description='comma separated node ids'), lens
                 edges.append({'id': f"{r['label']}:{s}>{t}", 'source': s, 'target': t, 'label': r['label'],
                               'props': r['props']})
     return {'nodes': nodes, 'edges': edges, 'missing': sorted(set(id_list) - present)}
+
+
+@router.get('/map')
+def site_map():
+    """Sites positioned by NetBox latitude/longitude, with inventory roll-ups and site-to-site circuits."""
+    sites = db.query('SELECT * FROM nbgraph.site_map ORDER BY name')
+    for s in sites:
+        s['node_id'] = f"site:{s['id']}"
+    placed = {s['id'] for s in sites if s['latitude'] is not None and s['longitude'] is not None}
+    links = [l for l in db.query('SELECT * FROM nbgraph.site_links ORDER BY cid')
+             if l['a_site_id'] in placed and l['z_site_id'] in placed]
+    return {'sites': sites, 'links': links, 'unplaced': len(sites) - len(placed)}

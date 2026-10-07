@@ -70,6 +70,21 @@ Click an ONT port (`wan0`, `voip1/2`, `eth1-4`). The inspector opens on **Servic
 3. **Provision via NetBox API** runs the saga and lists every NetBox change it made. The port gets a green ring
    and its new children (IP, VLAN, DID, service) appear on the canvas.
 
+## Map view
+
+The globe button next to the logo switches to a map of sites, placed by their NetBox **latitude/longitude**
+(OpenStreetMap tiles, so the browser needs internet access).
+
+* Marker size and number = devices at the site. Grey = site not `active`.
+* Orange lines = circuits whose A and Z ends terminate on two different sites (the metro backhaul in the demo).
+  Hover for CID, provider and status. Dashed = circuit not `active`.
+* Click a marker for its roll-up (devices per role, active services). **Show in graph →** switches back to the
+  graph view with that site expanded.
+* **Drag to reposition**: turn it on, then drag a marker. The new position is saved to NetBox (`PATCH` through
+  the CRUD API).
+* Sites with no coordinates are listed in the panel. Click **Place**, then click the map.
+* Site, device and circuit changes from anywhere (including NetBox's UI) refresh the map live.
+
 ## Live updates
 
 The `● live` chip shows the SSE connection. Any change, whether it comes from this UI, another browser, or
