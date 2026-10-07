@@ -102,6 +102,13 @@ _tokens: dict[str, tuple[str, float]] = {}  # username -> (bearer, expires_at)
 _lock = threading.Lock()
 
 
+def _is_superuser(username: str) -> bool:
+    """NetBox 4.7's REST API doesn't expose is_superuser, so read it from NetBox's own table."""
+    from . import db
+    row = db.query_one('SELECT is_superuser FROM public.users_user WHERE username = %s', (username,))
+    return bool(row and row['is_superuser'])
+
+
 def _sync_user(nb: NetBox, user: User) -> dict:
     s = get_settings()
     allowed = {g.strip() for g in s.oidc_groups.split(',') if g.strip()}
@@ -117,6 +124,11 @@ def _sync_user(nb: NetBox, user: User) -> dict:
             'is_active': True}
     existing = nb.first('users/users/', username=user.username)
     if existing:
+        # Never let an IdP account take over a privileged local account (e.g. an IdP user called "admin"):
+        # the service token could otherwise mint tokens for the NetBox superuser.
+        if _is_superuser(user.username):
+            raise AuthError(f'NetBox user "{user.username}" is a superuser and cannot be used through OIDC '
+                            'sign-in; give the IdP user a different username', 403)
         return nb.patch(f'users/users/{existing["id"]}/', body)
     # The password is never used: this account only signs in through graph-api-minted tokens (or NetBox SSO).
     return nb.post('users/users/', {'username': user.username, 'password': secrets.token_urlsafe(32), **body})

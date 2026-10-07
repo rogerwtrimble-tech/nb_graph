@@ -38,3 +38,11 @@ data:
   EMAIL_USE_SSL: "false"
   EMAIL_USE_TLS: "false"
   EMAIL_TIMEOUT: "5"
+  {{- if .Values.netbox.sso.enabled }}
+  NETBOX_SSO: oidc
+  NETBOX_SSO_ISSUER: {{ required "auth.oidc.issuer is required for netbox.sso" .Values.auth.oidc.issuer | quote }}
+  SOCIAL_AUTH_OIDC_OIDC_ENDPOINT: {{ .Values.auth.oidc.internalUrl | default .Values.auth.oidc.issuer | quote }}
+  SOCIAL_AUTH_OIDC_KEY: {{ .Values.netbox.sso.clientId | quote }}
+  NETBOX_SSO_LABEL: {{ .Values.netbox.sso.label | quote }}
+  NBGRAPH_OIDC_GROUPS: {{ .Values.auth.oidc.groups | quote }}
+  {{- end }}

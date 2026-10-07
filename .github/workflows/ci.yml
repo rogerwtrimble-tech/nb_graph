@@ -12,6 +12,7 @@ jobs:
         with: { python-version: '3.13' }
       - run: pip install -r graph-api/requirements-dev.txt
       - run: cd graph-api && pytest -q   # integration tests auto-skip without a running stack
+      - run: cd netbox/sso && pytest -q  # SSO pipeline group logic (no Django needed)
 
   ui:
     runs-on: ubuntu-latest

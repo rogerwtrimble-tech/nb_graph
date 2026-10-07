@@ -22,6 +22,7 @@ secrets:
   superuserApiKey: ""     # 12 alphanumerics
   superuserApiToken: ""   # 40 alphanumerics
   webhookSecret: ""
+  netboxSsoClientSecret: ""   # only used with netbox.sso.enabled (also settable as netbox.sso.clientSecret)
 
 postgres:
   image: {repository: docker.io/postgres, tag: 19beta4-alpine}
@@ -44,6 +45,13 @@ netbox:
   # Public URL users open NetBox at. Empty = derived from ingress.netboxHost.
   publicUrl: ""
   media: {size: 5Gi, storageClass: ""}
+  # Single sign-on to NetBox's own UI through the same IdP (auth.oidc.issuer / internalUrl / groups).
+  # Needs a confidential client in the IdP with redirect URI <netbox public URL>/oauth/complete/oidc/
+  sso:
+    enabled: false
+    clientId: netbox
+    clientSecret: ""      # or put it in secrets.existingSecret under key netbox-sso-client-secret
+    label: Single sign-on
   worker: {enabled: true, resources: {}}
   resources: {}
 

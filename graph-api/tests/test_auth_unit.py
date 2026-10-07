@@ -140,3 +140,37 @@ def test_auth_mode_none_is_a_no_op(monkeypatch, client):
     get_settings.cache_clear()
     assert auth.public_config() == {'mode': 'none'}
     assert client.get('/api/health').status_code == 200
+
+
+class FakeNB:
+    def __init__(self, users):
+        self.users, self.calls = users, []
+
+    def first(self, path, **kw):
+        if path == 'users/users/':
+            return next((u for u in self.users if u['username'] == kw['username']), None)
+        return {'id': 7, 'name': kw.get('name')}
+
+    def patch(self, path, body):
+        self.calls.append(('patch', path, body))
+        return {'id': 1, **body}
+
+    def post(self, path, body):
+        self.calls.append(('post', path, body))
+        return {'id': 2, **body}
+
+
+def test_sync_refuses_superuser_accounts(monkeypatch):
+    monkeypatch.setattr(auth, '_is_superuser', lambda username: username == 'admin')
+    nb = FakeNB([{'id': 1, 'username': 'admin'}])
+    with pytest.raises(auth.AuthError) as e:
+        auth._sync_user(nb, auth.User(username='admin', groups=['nbgraph-editors']))
+    assert e.value.status == 403 and nb.calls == []      # nothing patched, no groups changed
+
+
+def test_sync_updates_ordinary_user_and_maps_only_allowed_groups(monkeypatch):
+    monkeypatch.setattr(auth, '_is_superuser', lambda username: False)
+    nb = FakeNB([{'id': 1, 'username': 'alice', 'is_superuser': False}])
+    auth._sync_user(nb, auth.User(username='alice', name='Alice Editor', groups=['nbgraph-editors', 'other']))
+    (op, path, body), = nb.calls
+    assert (op, path, body['groups'], body['first_name']) == ('patch', 'users/users/1/', [7], 'Alice')

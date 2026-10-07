@@ -76,6 +76,8 @@ sequenceDiagram
 | `OIDC_GROUPS` | `nbgraph-editors,nbgraph-viewers` | allowed groups, mirrored to NetBox groups |
 | `USER_TOKEN_TTL_MINUTES` | `480` | lifetime of minted NetBox user tokens |
 
+NetBox container (SSO): `NETBOX_SSO`, `NETBOX_SSO_ISSUER`, `SOCIAL_AUTH_OIDC_OIDC_ENDPOINT`, `SOCIAL_AUTH_OIDC_KEY`, `SOCIAL_AUTH_OIDC_SECRET`, `NBGRAPH_OIDC_GROUPS`, `NETBOX_SSO_LABEL`.
+
 The service token (`NETBOX_TOKEN`) must be allowed to manage users and grant tokens. The demo superuser is.
 
 ## Using another IdP (Entra ID, Okta, Authentik, ...)
@@ -86,9 +88,49 @@ The service token (`NETBOX_TOKEN`) must be allowed to manage users and grant tok
 3. Set `OIDC_ISSUER` (and `OIDC_INTERNAL_URL` only if graph-api reaches the IdP at a different URL), then
    create NetBox groups named after the IdP groups you list in `OIDC_GROUPS`.
 
+## Single sign-on to NetBox's own UI
+
+`NETBOX_SSO=oidc` (independent of `AUTH_MODE`) adds a **Single sign-on** button to NetBox's login page,
+using the same IdP. With the bundled Keycloak:
+
+```bash
+# .env
+AUTH_MODE=oidc
+NETBOX_SSO=oidc
+docker compose --profile auth up -d
+```
+
+Open http://localhost:8000 → **Single sign-on** → sign in as `alice` / `bob`. The local `admin` password login
+still works.
+
+How it fits with the nb_graph UI:
+
+* **One NetBox account per person.** graph-api creates NetBox users named after the IdP's
+  `preferred_username`. The `nbgraph_sso` pipeline (`netbox/sso`, installed in the NetBox image) links the SSO
+  login to that same account instead of creating `alice-1a2b3c`. It also works the other way round: whichever
+  of the two you use first creates the account.
+* **Same group rule.** IdP groups listed in `NBGRAPH_OIDC_GROUPS` are mirrored onto NetBox groups of the same
+  name on every SSO login. Other NetBox groups an admin assigned by hand are left alone. Users in none of the
+  groups are refused **before** any NetBox account is created.
+* NetBox needs a **confidential** client. The demo realm has `netbox` with secret
+  `nbgraph-netbox-sso-demo-secret` (change it in `auth/realm-nbgraph.json` and `NETBOX_SSO_CLIENT_SECRET`).
+  Its redirect URI is `http://localhost:8000/oauth/complete/oidc/`.
+* NetBox reaches the IdP at `OIDC_INTERNAL_URL` and checks the ID token's `iss` against `OIDC_ISSUER`
+  (`NETBOX_SSO_ISSUER`), the same split as graph-api.
+* Logging out of NetBox ends the NetBox session only. The IdP session stays, so the next SSO click signs
+  straight back in.
+
+Helm: `netbox.sso.enabled=true` plus `netbox.sso.clientSecret` (it reuses `auth.oidc.issuer`, `internalUrl` and
+`groups`).
+
+## Privileged accounts are never mapped
+
+An IdP account whose username matches a NetBox **superuser** (for example an IdP user called `admin`) is
+refused, both by graph-api (403, no token minted, groups untouched) and by NetBox SSO. Otherwise anyone who can
+create that username in the IdP would get the superuser's rights. NetBox 4.7's REST API doesn't expose
+`is_superuser`, so graph-api reads it from NetBox's `users_user` table. The integration tests create a
+temporary Keycloak `admin` user to check this.
+
 ## Not covered yet
 
-* Signing in to **NetBox's own UI** with the same IdP. NetBox supports it (`SOCIAL_AUTH_OIDC_*` in
-  `netbox/configuration/configuration.py`), but it isn't wired up in compose. Users created by graph-api get
-  a random password and are meant to sign in through SSO.
 * Read filtering by NetBox permissions on the SQL graph.

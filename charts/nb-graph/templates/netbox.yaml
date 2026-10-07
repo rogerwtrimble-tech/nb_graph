@@ -71,6 +71,9 @@ spec:
             {{- include "nbg.secretEnv" (dict "root" $ "name" "SUPERUSER_PASSWORD" "key" "superuser-password") | nindent 12 }}
             {{- include "nbg.secretEnv" (dict "root" $ "name" "SUPERUSER_API_KEY" "key" "superuser-api-key") | nindent 12 }}
             {{- include "nbg.secretEnv" (dict "root" $ "name" "SUPERUSER_API_TOKEN" "key" "superuser-api-token") | nindent 12 }}
+            {{- if $.Values.netbox.sso.enabled }}
+            {{- include "nbg.secretEnv" (dict "root" $ "name" "SOCIAL_AUTH_OIDC_SECRET" "key" "netbox-sso-client-secret") | nindent 12 }}
+            {{- end }}
           {{- if eq $role "netbox" }}
           ports: [{name: http, containerPort: 8080}]
           startupProbe:      # the first start runs ~800 migrations against PG19

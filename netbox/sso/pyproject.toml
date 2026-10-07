@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nbgraph-sso"
+version = "0.1.0"
+description = "NetBox social-auth pipeline steps for nb_graph's OIDC single sign-on"
+requires-python = ">=3.12"
+license = { text = "Apache-2.0" }
+
+[tool.setuptools.packages.find]
+include = ["nbgraph_sso*"]

@@ -207,3 +207,87 @@ def test_oidc_editor_writes_are_attributed_in_netbox_changelog():
         assert users == {'alice'}, changes
     finally:
         alice.delete(f'/api/object/region/{rid}')
+
+
+# ------------------------------------------------------------------------------------- NetBox UI SSO
+import re
+from contextlib import contextmanager
+
+NB_URL = os.environ.get('NBGRAPH_NETBOX_URL', 'http://localhost:8000')
+_sso_on = OIDC and 'oauth/begin/oidc' in (httpx.get(f'{NB_URL}/login/', timeout=10).text if OIDC else '')
+sso_only = pytest.mark.skipif(not _sso_on, reason='NetBox runs without NETBOX_SSO=oidc')
+
+
+def netbox_sso_login(user: str, password: str | None = None) -> httpx.Response:
+    """The browser flow without a browser: NetBox login page -> POST /oauth/begin/oidc/ -> IdP form -> back."""
+    s = httpx.Client(follow_redirects=True, timeout=30)
+    page = s.get(f'{NB_URL}/login/')
+    csrf = re.search(r'name="csrfmiddlewaretoken" value="([^"]+)"', page.text).group(1)
+    idp = s.post(f'{NB_URL}/oauth/begin/oidc/', data={'csrfmiddlewaretoken': csrf},
+                 headers={'Referer': f'{NB_URL}/login/'})
+    action = re.search(r'<form[^>]+id="kc-form-login"[^>]+action="([^"]+)"', idp.text).group(1).replace('&amp;', '&')
+    for c in s.cookies.jar:  # Keycloak marks its cookies Secure; browsers still send them to http://localhost
+        c.secure = False
+    return s.post(action, data={'username': user, 'password': password or user, 'credentialId': ''})
+
+
+def _nb_user(username):
+    r = httpx.get(f'{NB_URL}/api/users/users/', params={'username': username},
+                  headers={'Authorization': f"Bearer {os.environ.get('NBGRAPH_NETBOX_TOKEN', 'nbt_nbgraphdemo1.0123456789abcdef0123456789abcdef01234567')}"})
+    res = r.json()['results']
+    return res[0] if res else None
+
+
+@contextmanager
+def keycloak_user(username: str, password: str, group: str):
+    """Temporary user in the demo realm (Keycloak admin API, master-realm admin from KEYCLOAK_ADMIN_PASSWORD)."""
+    base = AUTH['issuer'].split('/realms/')[0]
+    tok = httpx.post(f'{base}/realms/master/protocol/openid-connect/token', data={
+        'grant_type': 'password', 'client_id': 'admin-cli', 'username': 'admin',
+        'password': os.environ.get('KEYCLOAK_ADMIN_PASSWORD', 'admin')}).json()['access_token']
+    h = {'Authorization': f'Bearer {tok}'}
+    api = f'{base}/admin/realms/nbgraph'
+    r = httpx.post(f'{api}/users', headers=h, json={
+        'username': username, 'enabled': True, 'emailVerified': True, 'email': f'{username}@idp.example',
+        'firstName': 'Temp', 'lastName': 'User', 'groups': [group],
+        'credentials': [{'type': 'password', 'value': password, 'temporary': False}]})
+    assert r.status_code == 201, r.text
+    uid = r.headers['location'].rsplit('/', 1)[1]
+    try:
+        yield
+    finally:
+        httpx.delete(f'{api}/users/{uid}', headers=h)
+
+
+@sso_only
+def test_netbox_sso_reuses_the_account_graph_api_created():
+    client_for('alice').get('/api/me')          # graph-api makes sure the NetBox user exists
+    before = _nb_user('alice')
+    r = netbox_sso_login('alice')
+    assert r.url.host == httpx.URL(NB_URL).host and '/login' not in r.url.path, r.url
+    after = _nb_user('alice')
+    assert after['id'] == before['id']          # same account, not "alice-1a2b3c"
+    assert [g['name'] for g in after['groups']] == ['nbgraph-editors']
+
+
+@sso_only
+def test_netbox_sso_refuses_users_outside_nbgraph_groups_without_creating_them():
+    r = netbox_sso_login('carol')
+    assert '/login' in r.url.path and 'Single sign-on failed' in r.text
+    assert _nb_user('carol') is None
+
+
+@oidc_only
+def test_idp_user_named_like_the_netbox_superuser_is_refused_everywhere():
+    with keycloak_user('admin', 'takeover-attempt', 'nbgraph-editors'):
+        assert client_for_password('admin', 'takeover-attempt').get('/api/me').status_code == 403
+        if _sso_on:
+            r = netbox_sso_login('admin', 'takeover-attempt')
+            assert '/login' in r.url.path
+    # the local superuser is untouched: still no SSO identity linked to it
+    assert _nb_user('admin')['groups'] == []
+
+
+def client_for_password(user: str, password: str) -> httpx.Client:
+    return httpx.Client(base_url=API, timeout=60,
+                        headers={'Authorization': f'Bearer {oidc_token(user, password)}'})

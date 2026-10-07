@@ -54,3 +54,33 @@
 # from datetime import datetime
 # now = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
 # BANNER_TOP = f'<marquee width="200px">This instance started on {now}.</marquee>'
+
+
+####
+## nb_graph: single sign-on to NetBox's own UI through the same OIDC provider the nb_graph UI uses.
+## Off unless NETBOX_SSO=oidc (see docs/auth.md). Local username/password login keeps working for admins.
+####
+from os import environ as _env
+
+if _env.get('NETBOX_SSO', 'none').lower() == 'oidc':
+    REMOTE_AUTH_BACKEND = ['social_core.backends.open_id_connect.OpenIdConnectAuth']
+    # SOCIAL_AUTH_OIDC_OIDC_ENDPOINT / _KEY / _SECRET come from the environment (configuration.py).
+    # The endpoint is the issuer as NetBox reaches it (e.g. http://keycloak:8080/realms/nbgraph); the expected
+    # "iss" is the issuer as browsers see it, which can differ inside a compose network or cluster.
+    SOCIAL_AUTH_OIDC_SCOPE = ['openid', 'profile', 'email']
+    if _env.get('NETBOX_SSO_ISSUER'):
+        SOCIAL_AUTH_OIDC_ID_TOKEN_ISSUER = _env['NETBOX_SSO_ISSUER']
+    SOCIAL_AUTH_BACKEND_ATTRS = {'oidc': (_env.get('NETBOX_SSO_LABEL', 'Single sign-on'), 'login')}
+    SOCIAL_AUTH_PIPELINE = (
+        'social_core.pipeline.social_auth.social_details',
+        'social_core.pipeline.social_auth.social_uid',
+        'nbgraph_sso.pipeline.require_group',           # not in an nb_graph group -> refused, no account created
+        'social_core.pipeline.social_auth.social_user',
+        'nbgraph_sso.pipeline.link_existing_user',      # reuse the account graph-api created; never a superuser
+        'social_core.pipeline.user.get_username',
+        'social_core.pipeline.user.create_user',
+        'social_core.pipeline.social_auth.associate_user',
+        'nbgraph_sso.pipeline.sync_groups',             # IdP groups -> NetBox groups (NBGRAPH_OIDC_GROUPS)
+        'social_core.pipeline.social_auth.load_extra_data',
+        'social_core.pipeline.user.user_details',
+    )

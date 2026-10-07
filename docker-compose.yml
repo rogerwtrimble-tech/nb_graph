@@ -30,6 +30,13 @@ x-netbox: &netbox
     SUPERUSER_PASSWORD: ${SUPERUSER_PASSWORD}
     SUPERUSER_API_KEY: ${SUPERUSER_API_KEY}
     SUPERUSER_API_TOKEN: ${SUPERUSER_API_TOKEN}
+    # Single sign-on to NetBox's own UI (NETBOX_SSO=oidc, with --profile auth or your own IdP). docs/auth.md
+    NETBOX_SSO: ${NETBOX_SSO:-none}
+    NETBOX_SSO_ISSUER: ${OIDC_ISSUER:-http://localhost:8180/realms/nbgraph}
+    SOCIAL_AUTH_OIDC_OIDC_ENDPOINT: ${OIDC_INTERNAL_URL:-http://keycloak:8080/realms/nbgraph}
+    SOCIAL_AUTH_OIDC_KEY: ${NETBOX_SSO_CLIENT_ID:-netbox}
+    SOCIAL_AUTH_OIDC_SECRET: ${NETBOX_SSO_CLIENT_SECRET:-nbgraph-netbox-sso-demo-secret}
+    NBGRAPH_OIDC_GROUPS: ${OIDC_GROUPS:-nbgraph-editors,nbgraph-viewers}
   user: "netbox:root"
   volumes:
     - ./netbox/configuration:/etc/netbox/config:ro

@@ -64,3 +64,18 @@ questions:
         label: OIDC client id (public client, PKCE)
         type: string
         default: nb-graph
+  - variable: netbox.sso.enabled
+    label: Single sign-on to NetBox's own UI
+    description: Uses the issuer above. Needs a confidential IdP client with redirect URI <NetBox URL>/oauth/complete/oidc/
+    type: boolean
+    default: false
+    group: Authentication
+    show_subquestion_if: true
+    subquestions:
+      - variable: netbox.sso.clientId
+        label: NetBox client id
+        type: string
+        default: netbox
+      - variable: netbox.sso.clientSecret
+        label: NetBox client secret
+        type: password
