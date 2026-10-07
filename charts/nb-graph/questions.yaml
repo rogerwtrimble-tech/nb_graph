@@ -1,0 +1,66 @@
+# Rancher Apps & Marketplace install form
+categories: [Networking]
+namespace: nb-graph
+questions:
+  - variable: ingress.enabled
+    label: Expose with Ingress
+    type: boolean
+    default: true
+    group: Access
+    show_subquestion_if: true
+    subquestions:
+      - variable: ingress.uiHost
+        label: UI hostname
+        type: hostname
+        default: nb-graph.localhost
+      - variable: ingress.netboxHost
+        label: NetBox hostname
+        type: hostname
+        default: netbox.nb-graph.localhost
+  - variable: service.type
+    label: Service type
+    type: enum
+    options: [ClusterIP, LoadBalancer, NodePort]
+    default: ClusterIP
+    group: Access
+  - variable: image.registry
+    label: Image registry
+    description: Leave empty on Rancher Desktop (dockerd engine) after `docker compose build`. Otherwise the registry holding nb_graph/* images.
+    type: string
+    default: ""
+    group: Images
+  - variable: seed.demoData
+    label: Load the FTTH demo network
+    type: boolean
+    default: true
+    group: Data
+  - variable: postgres.persistence.size
+    label: PostgreSQL volume size
+    type: string
+    default: 10Gi
+    group: Data
+  - variable: netbox.ipv4Only
+    label: NetBox listens on IPv4 only
+    description: Turn on if NetBox crashes with "Address family not supported by protocol" (nodes without IPv6).
+    type: boolean
+    default: false
+    group: NetBox
+  - variable: auth.mode
+    label: Per-user sign-in
+    type: enum
+    options: [none, oidc]
+    default: none
+    group: Authentication
+    show_subquestion_if: oidc
+    subquestions:
+      - variable: auth.oidc.issuer
+        label: OIDC issuer URL (as the browser sees it)
+        type: string
+        required: true
+      - variable: auth.oidc.internalUrl
+        label: Issuer URL from inside the cluster (if different)
+        type: string
+      - variable: auth.oidc.clientId
+        label: OIDC client id (public client, PKCE)
+        type: string
+        default: nb-graph

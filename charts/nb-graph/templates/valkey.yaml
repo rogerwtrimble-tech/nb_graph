@@ -1,0 +1,63 @@
+{{- range $role := list "redis" "redis-cache" }}
+{{- $c := dict "root" $ "component" $role }}
+{{- $persist := and (eq $role "redis") $.Values.valkey.persistence.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "nbg.name" $c }}
+  labels: {{- include "nbg.labels" $c | nindent 4 }}
+spec:
+  selector: {{- include "nbg.selector" $c | nindent 4 }}
+  ports: [{name: redis, port: 6379, targetPort: 6379}]
+---
+{{- if $persist }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "nbg.name" $c }}
+  labels: {{- include "nbg.labels" $c | nindent 4 }}
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- with $.Values.valkey.persistence.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources: {requests: {storage: {{ $.Values.valkey.persistence.size }}}}
+---
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nbg.name" $c }}
+  labels: {{- include "nbg.labels" $c | nindent 4 }}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {{- include "nbg.selector" $c | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "nbg.labels" $c | nindent 8 }}
+    spec:
+      {{- include "nbg.pod" $ | nindent 6 }}
+      containers:
+        - name: valkey
+          image: {{ include "nbg.image" (dict "root" $ "img" $.Values.valkey.image) }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          command: ["sh", "-c", "exec valkey-server {{ if $persist }}--appendonly yes {{ end }}--requirepass \"$REDIS_PASSWORD\""]
+          env:
+            {{- include "nbg.secretEnv" (dict "root" $ "name" "REDIS_PASSWORD" "key" (ternary "redis-password" "redis-cache-password" (eq $role "redis"))) | nindent 12 }}
+          ports: [{name: redis, containerPort: 6379}]
+          readinessProbe:
+            exec: {command: ["sh", "-c", "[ \"$(valkey-cli --pass \"$REDIS_PASSWORD\" ping)\" = PONG ]"]}
+            periodSeconds: 5
+          volumeMounts: [{name: data, mountPath: /data}]
+          resources: {{- toYaml $.Values.valkey.resources | nindent 12 }}
+      volumes:
+        - name: data
+          {{- if $persist }}
+          persistentVolumeClaim: {claimName: {{ include "nbg.name" $c }}}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+{{- end }}

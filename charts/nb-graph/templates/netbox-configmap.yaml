@@ -1,0 +1,40 @@
+{{- $c := dict "root" . "component" "netbox" }}
+{{- $pg := include "nbg.name" (dict "root" . "component" "postgres") }}
+{{- $redis := include "nbg.name" (dict "root" . "component" "redis") }}
+{{- $cache := include "nbg.name" (dict "root" . "component" "redis-cache") }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nbg.name" $c }}-env
+  labels: {{- include "nbg.labels" $c | nindent 4 }}
+data:
+  # same settings as netbox/env/netbox.env, with in-cluster service names
+  ALLOWED_HOSTS: "*"
+  CORS_ORIGIN_ALLOW_ALL: "True"
+  CSRF_TRUSTED_ORIGINS: {{ include "nbg.netboxPublicUrl" . | quote }}
+  DB_HOST: {{ $pg }}
+  DB_NAME: netbox
+  DB_USER: netbox
+  GRAPHQL_ENABLED: "true"
+  MEDIA_ROOT: /opt/netbox/netbox/media
+  METRICS_ENABLED: "false"
+  REDIS_HOST: {{ $redis }}
+  REDIS_DATABASE: "0"
+  REDIS_SSL: "false"
+  REDIS_INSECURE_SKIP_TLS_VERIFY: "false"
+  REDIS_CACHE_HOST: {{ $cache }}
+  REDIS_CACHE_DATABASE: "1"
+  REDIS_CACHE_SSL: "false"
+  REDIS_CACHE_INSECURE_SKIP_TLS_VERIFY: "false"
+  RELEASE_CHECK_URL: ""
+  SKIP_SUPERUSER: "false"
+  SUPERUSER_NAME: {{ .Values.netbox.superuserName | quote }}
+  SUPERUSER_EMAIL: {{ .Values.netbox.superuserEmail | quote }}
+  TIME_ZONE: {{ .Values.netbox.timeZone | quote }}
+  WEBHOOKS_ENABLED: "true"
+  EMAIL_SERVER: localhost
+  EMAIL_PORT: "25"
+  EMAIL_FROM: netbox@example.com
+  EMAIL_USE_SSL: "false"
+  EMAIL_USE_TLS: "false"
+  EMAIL_TIMEOUT: "5"

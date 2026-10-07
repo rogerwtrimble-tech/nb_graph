@@ -1,0 +1,15 @@
+apiVersion: v2
+name: nb-graph
+description: Graph-first UI for NetBox on PostgreSQL 19 (NetBox 4.7, graph-api, React/Cytoscape UI)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.27.0-0"
+keywords: [netbox, graph, ipam, dcim, ftth]
+home: https://github.com/rogerwtrimble-tech/nb_graph
+sources: [https://github.com/rogerwtrimble-tech/nb_graph]
+annotations:
+  catalog.cattle.io/display-name: nb_graph
+  catalog.cattle.io/release-name: nb-graph
+  catalog.cattle.io/namespace: nb-graph
+  catalog.cattle.io/kube-version: ">=1.27.0-0"

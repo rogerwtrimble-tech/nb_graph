@@ -1,0 +1,59 @@
+{{- $c := dict "root" . "component" "graph-api" }}
+{{- $pg := include "nbg.name" (dict "root" . "component" "postgres") }}
+{{- $nb := include "nbg.name" (dict "root" . "component" "netbox") }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "nbg.name" $c }}
+  labels: {{- include "nbg.labels" $c | nindent 4 }}
+spec:
+  selector: {{- include "nbg.selector" $c | nindent 4 }}
+  ports: [{name: http, port: 8090, targetPort: 8090}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nbg.name" $c }}
+  labels: {{- include "nbg.labels" $c | nindent 4 }}
+spec:
+  replicas: 1   # live events (SSE hub) and bulk jobs are in-process
+  selector:
+    matchLabels: {{- include "nbg.selector" $c | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "nbg.labels" $c | nindent 8 }}
+    spec:
+      {{- include "nbg.pod" . | nindent 6 }}
+      initContainers:
+        {{- include "nbg.waitFor" (dict "root" . "name" "netbox" "host" $nb "port" .Values.service.netboxPort) | nindent 8 }}
+      containers:
+        - name: graph-api
+          image: {{ include "nbg.image" (dict "root" . "img" .Values.graphApi.image) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            {{- include "nbg.secretEnv" (dict "root" . "name" "DB_PASSWORD" "key" "db-password") | nindent 12 }}
+            {{- include "nbg.secretEnv" (dict "root" . "name" "NB_KEY" "key" "superuser-api-key") | nindent 12 }}
+            {{- include "nbg.secretEnv" (dict "root" . "name" "NB_TOKEN" "key" "superuser-api-token") | nindent 12 }}
+            {{- include "nbg.secretEnv" (dict "root" . "name" "WEBHOOK_SECRET" "key" "webhook-secret") | nindent 12 }}
+            - {name: DATABASE_URL, value: "postgresql://netbox:$(DB_PASSWORD)@{{ $pg }}:5432/netbox"}
+            - {name: NETBOX_URL, value: "http://{{ $nb }}:{{ .Values.service.netboxPort }}"}
+            - {name: NETBOX_TOKEN, value: "nbt_$(NB_KEY).$(NB_TOKEN)"}
+            - {name: NETBOX_PUBLIC_URL, value: {{ include "nbg.netboxPublicUrl" . | quote }}}
+            - {name: CORS_ORIGINS, value: {{ include "nbg.uiPublicUrl" . | quote }}}
+            - {name: AUTH_MODE, value: {{ .Values.auth.mode | quote }}}
+            {{- if eq .Values.auth.mode "oidc" }}
+            - {name: OIDC_ISSUER, value: {{ required "auth.oidc.issuer is required when auth.mode=oidc" .Values.auth.oidc.issuer | quote }}}
+            - {name: OIDC_INTERNAL_URL, value: {{ .Values.auth.oidc.internalUrl | quote }}}
+            - {name: OIDC_CLIENT_ID, value: {{ .Values.auth.oidc.clientId | quote }}}
+            - {name: OIDC_GROUPS, value: {{ .Values.auth.oidc.groups | quote }}}
+            {{- end }}
+          ports: [{name: http, containerPort: 8090}]
+          readinessProbe:   # ready once the nbgraph schema is installed (same check as the Dockerfile)
+            exec:
+              command: ["python", "-c", "import urllib.request,json,sys; d=json.load(urllib.request.urlopen('http://127.0.0.1:8090/api/health',timeout=3)); sys.exit(0 if d.get('graph_schema')=='ready' else 1)"]
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            tcpSocket: {port: http}
+            periodSeconds: 20
+          resources: {{- toYaml .Values.graphApi.resources | nindent 12 }}

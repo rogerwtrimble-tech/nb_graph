@@ -1,0 +1,36 @@
+{{- $c := dict "root" . "component" "ui" }}
+{{- $api := include "nbg.name" (dict "root" . "component" "graph-api") }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nbg.name" $c }}-nginx
+  labels: {{- include "nbg.labels" $c | nindent 4 }}
+data:
+  # ui/nginx.conf with the release's graph-api service as upstream
+  default.conf: |
+    server {
+        listen 80;
+        server_name _;
+        root /usr/share/nginx/html;
+        location /api/events/stream {
+            proxy_pass http://{{ $api }}:8090;
+            proxy_http_version 1.1;
+            proxy_set_header Connection '';
+            proxy_buffering off;
+            proxy_cache off;
+            proxy_read_timeout 1h;
+        }
+        location /api/ {
+            proxy_pass http://{{ $api }}:8090;
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_read_timeout 120s;
+        }
+        location /docs { proxy_pass http://{{ $api }}:8090; }
+        location /openapi.json { proxy_pass http://{{ $api }}:8090; }
+        location / { try_files $uri $uri/ /index.html; }
+        gzip on;
+        gzip_types text/css application/javascript application/json image/svg+xml;
+    }

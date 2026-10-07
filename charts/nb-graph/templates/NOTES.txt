@@ -1,0 +1,22 @@
+nb_graph is starting. The first NetBox start runs ~800 migrations on PostgreSQL 19 (5-10 minutes){{ if .Values.seed.enabled }}, then the
+seed job loads the demo network{{ end }}.
+
+  kubectl -n {{ .Release.Namespace }} get pods -w
+{{- if .Values.seed.enabled }}
+  kubectl -n {{ .Release.Namespace }} logs -f job/{{ include "nbg.name" (dict "root" . "component" "seed") }}     # wait for "seed complete"
+{{- end }}
+
+UI:      {{ include "nbg.uiPublicUrl" . }}
+NetBox:  {{ include "nbg.netboxPublicUrl" . }}   (user {{ .Values.netbox.superuserName }})
+{{- if not .Values.ingress.enabled }}
+         kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "nbg.name" (dict "root" . "component" "ui") }} {{ .Values.service.uiPort }}
+         kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "nbg.name" (dict "root" . "component" "netbox") }} {{ .Values.service.netboxPort }}
+{{- end }}
+
+NetBox admin password:
+  kubectl -n {{ .Release.Namespace }} get secret {{ include "nbg.secretName" . }} -o jsonpath='{.data.superuser-password}' | base64 -d; echo
+{{- if eq .Values.auth.mode "oidc" }}
+
+Per-user OIDC auth is ON (issuer {{ .Values.auth.oidc.issuer }}). Register {{ include "nbg.uiPublicUrl" . }}/ as a redirect URI
+for client "{{ .Values.auth.oidc.clientId }}". See docs/auth.md.
+{{- end }}

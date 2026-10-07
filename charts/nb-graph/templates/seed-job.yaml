@@ -1,0 +1,35 @@
+{{- if .Values.seed.enabled }}
+{{- $c := dict "root" . "component" "seed" }}
+{{- $nb := include "nbg.name" (dict "root" . "component" "netbox") }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "nbg.name" $c }}
+  labels: {{- include "nbg.labels" $c | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  backoffLimit: 3
+  activeDeadlineSeconds: 2400
+  template:
+    metadata:
+      labels: {{- include "nbg.labels" $c | nindent 8 }}
+    spec:
+      {{- include "nbg.pod" . | nindent 6 }}
+      restartPolicy: OnFailure
+      containers:
+        - name: seed
+          image: {{ include "nbg.image" (dict "root" . "img" .Values.graphApi.image) }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["python", "-m", "app.seed"]   # idempotent: get-or-create everything
+          env:
+            {{- include "nbg.secretEnv" (dict "root" . "name" "NB_KEY" "key" "superuser-api-key") | nindent 12 }}
+            {{- include "nbg.secretEnv" (dict "root" . "name" "NB_TOKEN" "key" "superuser-api-token") | nindent 12 }}
+            {{- include "nbg.secretEnv" (dict "root" . "name" "WEBHOOK_SECRET" "key" "webhook-secret") | nindent 12 }}
+            - {name: NETBOX_URL, value: "http://{{ $nb }}:{{ .Values.service.netboxPort }}"}
+            - {name: NETBOX_TOKEN, value: "nbt_$(NB_KEY).$(NB_TOKEN)"}
+            - {name: SEED_DEMO_DATA, value: {{ .Values.seed.demoData | quote }}}
+            - {name: SEED_WEBHOOK_URL, value: "http://{{ include "nbg.name" (dict "root" . "component" "graph-api") }}:8090/api/events/netbox"}
+{{- end }}

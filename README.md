@@ -5,7 +5,8 @@
 **Region → Site → OLT → PON → ONT → interface → IP / VLAN / phone number / service**, and every create, edit,
 delete and provisioning action is sent back through the **NetBox REST API**.
 
-It ships as one self-contained demo stack (`docker compose`) built for **Rancher Desktop**.
+It ships as one self-contained demo stack (`docker compose`) built for **Rancher Desktop**, plus a Helm chart
+(`charts/nb-graph`) for k3s / Rancher Apps.
 
 ![Site to OLT to ONT to interfaces](docs/screenshots/02-site-olt-pon-ont-interfaces.png)
 
@@ -79,6 +80,8 @@ validation, permissions, change log and webhooks all still apply. See [docs/arch
 ```
 nb_graph/
 ├── docker-compose.yml        # the whole demo stack
+├── charts/nb-graph/          # Helm chart (same stack on Kubernetes / Rancher Apps)
+├── auth/                     # demo Keycloak realm for the optional OIDC profile
 ├── .env.example              # ports, image tags, demo secrets
 ├── Makefile                  # up / down / reset / seed / psql / test ...
 ├── db/
@@ -104,6 +107,7 @@ nb_graph/
 | [docs/provisioning.md](docs/provisioning.md) | FTTH demo model, service catalogue, provisioning saga and rollback |
 | [docs/ui-guide.md](docs/ui-guide.md) | Using the explorer: gestures, lenses, inspector, CRUD, live updates |
 | [docs/api.md](docs/api.md) | graph-api REST reference with curl examples |
+| [charts/nb-graph/README.md](charts/nb-graph/README.md) | Helm chart: Rancher Desktop k3s, Rancher Apps, other clusters |
 | [docs/auth.md](docs/auth.md) | Per-user OIDC sign-in, NetBox user/permission mapping, using your own IdP |
 | [docs/nb_graph-status.md](docs/nb_graph-status.md) | Build status, agreed decisions and next ideas |
 

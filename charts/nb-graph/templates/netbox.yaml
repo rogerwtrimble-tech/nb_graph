@@ -1,0 +1,94 @@
+{{- $c := dict "root" . "component" "netbox" }}
+{{- $pg := include "nbg.name" (dict "root" . "component" "postgres") }}
+{{- $redis := include "nbg.name" (dict "root" . "component" "redis") }}
+{{- $cache := include "nbg.name" (dict "root" . "component" "redis-cache") }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "nbg.name" $c }}-media
+  labels: {{- include "nbg.labels" $c | nindent 4 }}
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- with .Values.netbox.media.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources: {requests: {storage: {{ .Values.netbox.media.size }}}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "nbg.name" $c }}
+  labels: {{- include "nbg.labels" $c | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  selector: {{- include "nbg.selector" $c | nindent 4 }}
+  ports: [{name: http, port: {{ .Values.service.netboxPort }}, targetPort: 8080}]
+{{- range $role := list "netbox" "netbox-worker" }}
+{{- if or (eq $role "netbox") $.Values.netbox.worker.enabled }}
+{{- $w := dict "root" $ "component" $role }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nbg.name" $w }}
+  labels: {{- include "nbg.labels" $w | nindent 4 }}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}   # one writer of migrations and the media volume
+  selector:
+    matchLabels: {{- include "nbg.selector" $w | nindent 6 }}
+  template:
+    metadata:
+      labels: {{- include "nbg.labels" $w | nindent 8 }}
+      annotations:
+        checksum/env: {{ include (print $.Template.BasePath "/netbox-configmap.yaml") $ | sha256sum | trunc 16 }}
+    spec:
+      {{- include "nbg.pod" $ | nindent 6 }}
+      securityContext: {runAsUser: 999, runAsGroup: 0, fsGroup: 0}   # the image's netbox user
+      initContainers:
+        {{- include "nbg.waitFor" (dict "root" $ "name" "postgres" "host" $pg "port" 5432) | nindent 8 }}
+        {{- include "nbg.waitFor" (dict "root" $ "name" "redis" "host" $redis "port" 6379) | nindent 8 }}
+        {{- if eq $role "netbox-worker" }}
+        {{- include "nbg.waitFor" (dict "root" $ "name" "netbox" "host" (include "nbg.name" $c) "port" $.Values.service.netboxPort) | nindent 8 }}
+        {{- end }}
+      containers:
+        - name: {{ $role }}
+          image: {{ include "nbg.image" (dict "root" $ "img" $.Values.netbox.image) }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          {{- if eq $role "netbox-worker" }}
+          command: ["/opt/netbox/venv/bin/python", "/opt/netbox/netbox/manage.py", "rqworker"]
+          {{- else if $.Values.netbox.ipv4Only }}
+          args: ["/opt/netbox/docker-entrypoint.sh", "bash", "-c",
+                 "sed 's/--host \"::\"/--host \"0.0.0.0\"/' /opt/netbox/launch-netbox.sh > /tmp/launch-netbox.sh && exec bash /tmp/launch-netbox.sh"]
+          {{- end }}
+          envFrom: [{configMapRef: {name: {{ include "nbg.name" $c }}-env}}]
+          env:
+            {{- include "nbg.secretEnv" (dict "root" $ "name" "DB_PASSWORD" "key" "db-password") | nindent 12 }}
+            {{- include "nbg.secretEnv" (dict "root" $ "name" "REDIS_PASSWORD" "key" "redis-password") | nindent 12 }}
+            {{- include "nbg.secretEnv" (dict "root" $ "name" "REDIS_CACHE_PASSWORD" "key" "redis-cache-password") | nindent 12 }}
+            {{- include "nbg.secretEnv" (dict "root" $ "name" "SECRET_KEY" "key" "secret-key") | nindent 12 }}
+            {{- include "nbg.secretEnv" (dict "root" $ "name" "API_TOKEN_PEPPER_1" "key" "api-token-pepper") | nindent 12 }}
+            {{- include "nbg.secretEnv" (dict "root" $ "name" "SUPERUSER_PASSWORD" "key" "superuser-password") | nindent 12 }}
+            {{- include "nbg.secretEnv" (dict "root" $ "name" "SUPERUSER_API_KEY" "key" "superuser-api-key") | nindent 12 }}
+            {{- include "nbg.secretEnv" (dict "root" $ "name" "SUPERUSER_API_TOKEN" "key" "superuser-api-token") | nindent 12 }}
+          {{- if eq $role "netbox" }}
+          ports: [{name: http, containerPort: 8080}]
+          startupProbe:      # the first start runs ~800 migrations against PG19
+            httpGet: {path: /login/, port: http}
+            periodSeconds: 10
+            failureThreshold: 90
+          readinessProbe:
+            httpGet: {path: /login/, port: http}
+            periodSeconds: 15
+          livenessProbe:
+            httpGet: {path: /login/, port: http}
+            periodSeconds: 30
+            failureThreshold: 5
+          {{- end }}
+          volumeMounts: [{name: media, mountPath: /opt/netbox/netbox/media}]
+          resources: {{- toYaml $.Values.netbox.resources | nindent 12 }}
+      volumes:
+        - name: media
+          persistentVolumeClaim: {claimName: {{ include "nbg.name" $c }}-media}
+{{- end }}
+{{- end }}

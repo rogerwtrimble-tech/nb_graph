@@ -8,9 +8,11 @@ nb_graph (Claude Project name: "netbox-graph"): a graph built from NetBox's Post
 ## Fixed decisions (don't re-open without the user)
 - PostgreSQL 19beta4 plus a live SQL projection (`nbgraph` schema: vertices/edges views, BFS traverse/shortest_path). There is no SQL/PGQ until PG20; the future definition lives in `db/graph/090_pgq_future.sql`.
 - NetBox 4.7.2 (netbox-docker v4.7-5.1.1). DIDs are handled by the in-repo `netbox_numbers` plugin, not phonebox.
-- Deployment: Rancher Desktop (dockerd) with docker compose. Helm is a roadmap item only.
+- Deployment: Rancher Desktop (dockerd) with docker compose is primary. `charts/nb-graph` deploys the same stack on k3s / Rancher Apps.
 - Ports: UI 8080, NetBox 8000, graph-api 8090, PG 5432.
 
 ## Working conventions
 - Default branch: `main`.
-- Tests: pytest (unit plus live integration) for the graph-api and plugin; typecheck and build for the UI; `docker compose config` must validate.
+- Tests: pytest (unit plus live integration) for the graph-api and plugin; typecheck and build for the UI; `docker compose config` must validate; `helm lint charts/nb-graph`.
+- Integration tests run against a live stack (`docker compose up`). With `AUTH_MODE=oidc` + `--profile auth` they sign in as alice via the demo Keycloak realm.
+- Optional per-user auth: `AUTH_MODE=oidc` (default `none`), see docs/auth.md.
